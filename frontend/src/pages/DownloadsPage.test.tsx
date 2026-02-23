@@ -101,3 +101,47 @@ test('met à jour la progression en temps réel via SSE', async () => {
     globalThis.EventSource = originalEventSource
   }
 })
+
+test("affiche la raison d'échec en temps réel via SSE", async () => {
+  const originalEventSource = globalThis.EventSource
+  MockEventSource.instances = []
+  globalThis.EventSource = MockEventSource as unknown as typeof EventSource
+  try {
+    const client = createMockClient()
+    client.listDownloads = vi.fn().mockResolvedValue([
+      {
+        id: 'd-failed',
+        sourceLink: 'a',
+        directLink: 'a',
+        fileName: 'broken.bin',
+        status: 'running',
+        downloadedBytes: 0,
+        sizeBytes: 4096,
+        speedBytes: 0,
+        etaSeconds: 0,
+        useDebrid: false
+      }
+    ])
+
+    render(
+      <APIProvider client={client}>
+        <MemoryRouter>
+          <DownloadsPage />
+        </MemoryRouter>
+      </APIProvider>
+    )
+
+    expect(await screen.findByText('broken.bin')).toBeInTheDocument()
+
+    await act(async () => {
+      MockEventSource.instances[0].emit('download_failed', {
+        id: 'd-failed',
+        error: 'http status 502'
+      })
+    })
+
+    await waitFor(() => expect(screen.getByText('Raison: http status 502')).toBeInTheDocument())
+  } finally {
+    globalThis.EventSource = originalEventSource
+  }
+})

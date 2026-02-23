@@ -20,6 +20,11 @@ function parseSSEData(event: MessageEvent): Record<string, unknown> {
   }
 }
 
+function readPayloadString(payload: Record<string, unknown>, key: string): string {
+  const value = payload[key]
+  return typeof value === 'string' ? value : ''
+}
+
 const eventsBaseURL = import.meta.env.VITE_API_BASE ?? ''
 const eventsURL = eventsBaseURL ? `${eventsBaseURL}/api/events` : '/api/events'
 
@@ -83,6 +88,7 @@ export function DownloadsPage() {
     const applyStatus = (status: DownloadJob['status']) => (event: MessageEvent) => {
       const payload = parseSSEData(event)
       const id = String(payload.id ?? '')
+      const eventError = readPayloadString(payload, 'error') || readPayloadString(payload, 'errorMessage')
       if (!id) return
       setJobs((prev) => prev.map((job) => {
         if (job.id !== id) return job
@@ -92,6 +98,11 @@ export function DownloadsPage() {
         }
         if (status === 'completed') {
           next.etaSeconds = 0
+        }
+        if (status === 'failed') {
+          next.errorMessage = eventError || next.errorMessage || 'Échec sans détail'
+        } else if (status === 'running' || status === 'queued' || status === 'completed') {
+          next.errorMessage = ''
         }
         return next
       }))
@@ -114,13 +125,27 @@ export function DownloadsPage() {
               downloadedBytes,
               sizeBytes,
               speedBytes,
-              etaSeconds
+              etaSeconds,
+              errorMessage: ''
             }
           : job
       )))
     }
 
+    const onRetry = (event: MessageEvent) => {
+      const payload = parseSSEData(event)
+      const id = String(payload.id ?? '')
+      const eventError = readPayloadString(payload, 'error') || readPayloadString(payload, 'errorMessage')
+      if (!id) return
+      setJobs((prev) => prev.map((job) => (
+        job.id === id
+          ? { ...job, status: 'running', errorMessage: eventError || job.errorMessage || '' }
+          : job
+      )))
+    }
+
     source.addEventListener('download_progress', onProgress as EventListener)
+    source.addEventListener('download_retry', onRetry as EventListener)
     source.addEventListener('download_queued', applyStatus('queued') as EventListener)
     source.addEventListener('download_started', applyStatus('running') as EventListener)
     source.addEventListener('download_paused', applyStatus('paused') as EventListener)
@@ -291,6 +316,11 @@ export function DownloadsPage() {
               <small>vitesse {asKB(job.speedBytes)}/s</small>
               <small>ETA {job.etaSeconds > 0 ? `${job.etaSeconds}s` : '-'}</small>
             </div>
+            {job.errorMessage ? (
+              <p className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-700">
+                Raison: {job.errorMessage}
+              </p>
+            ) : null}
 
             <div className="mt-4 flex flex-wrap gap-2">
               <button className="btn" onClick={() => void runAction(() => api.startDownload(job.id))}>Start</button>

@@ -11,6 +11,7 @@ export interface DownloadJob {
   speedBytes: number
   etaSeconds: number
   useDebrid: boolean
+  errorMessage?: string
 }
 
 export interface DebridProvider {

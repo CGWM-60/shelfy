@@ -225,11 +225,11 @@ func (e *Engine) run(ctx context.Context, id string) {
 			job.ErrorMessage = err.Error()
 			job.UpdatedAt = e.clock.Now()
 			_ = e.repo.UpdateDownload(context.Background(), job)
-			e.bus.Publish(events.Event{Type: "download_retry", At: e.clock.Now(), Payload: map[string]interface{}{"id": id, "retry": job.Retries}})
+			e.bus.Publish(events.Event{Type: "download_retry", At: e.clock.Now(), Payload: map[string]interface{}{"id": id, "retry": job.Retries, "error": err.Error()}})
 			if job.Retries > job.MaxRetries {
 				job.Status = domain.DownloadFailed
 				_ = e.repo.UpdateDownload(context.Background(), job)
-				e.bus.Publish(events.Event{Type: "download_failed", At: e.clock.Now(), Payload: map[string]interface{}{"id": id, "error": err.Error()}})
+				e.bus.Publish(events.Event{Type: "download_failed", At: e.clock.Now(), Payload: map[string]interface{}{"id": id, "error": err.Error(), "errorMessage": err.Error()}})
 				return
 			}
 			select {
