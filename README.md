@@ -25,6 +25,11 @@ Ensuite (commande unique API + worker + frontend):
 make dev
 ```
 Le frontend Vite proxy automatiquement `/api` et `/files` vers `http://localhost:8080` en local.
+Par défaut, `make dev` expose aussi le front sur le réseau (`0.0.0.0:5173`), donc accès via `http://IP_DU_SERVEUR:5173`.
+Tu peux surcharger avec:
+```bash
+make dev FRONTEND_HOST=0.0.0.0 FRONTEND_PORT=4173
+```
 
 ## Configuration (priorité)
 1. Variables d'env

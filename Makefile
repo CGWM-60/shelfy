@@ -1,5 +1,8 @@
 .PHONY: deps dev dev-api dev-worker test-back test-front e2e lint test ci
 
+FRONTEND_HOST ?= 0.0.0.0
+FRONTEND_PORT ?= 5173
+
 deps:
 	go mod tidy
 	npm install --prefix frontend
@@ -29,7 +32,7 @@ dev:
 		load_dotenv; \
 		go run ./cmd/api & api_pid=$$!; \
 		go run ./cmd/worker & worker_pid=$$!; \
-		npm run dev --prefix frontend & front_pid=$$!; \
+		npm run dev --prefix frontend -- --host $(FRONTEND_HOST) --port $(FRONTEND_PORT) & front_pid=$$!; \
 		cleanup(){ \
 			[ "$$cleaned" -eq 0 ] || return 0; \
 			cleaned=1; \
