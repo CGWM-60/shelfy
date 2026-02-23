@@ -1,0 +1,127 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  :root.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply m-0 bg-slate-100 text-slate-900;
+    background-image:
+      radial-gradient(1200px circle at 0% 0%, rgba(14, 165, 233, 0.18), transparent 45%),
+      radial-gradient(900px circle at 100% 0%, rgba(56, 189, 248, 0.18), transparent 45%),
+      linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  }
+
+  .dark body {
+    @apply bg-slate-950 text-slate-100;
+    background-image:
+      radial-gradient(1000px circle at 0% 0%, rgba(56, 189, 248, 0.22), transparent 45%),
+      radial-gradient(800px circle at 100% 0%, rgba(14, 116, 144, 0.24), transparent 48%),
+      linear-gradient(180deg, #020617 0%, #0f172a 100%);
+  }
+
+  .dark .text-slate-900 {
+    @apply text-slate-100;
+  }
+  .dark .text-slate-800 {
+    @apply text-slate-200;
+  }
+  .dark .text-slate-700 {
+    @apply text-slate-300;
+  }
+  .dark .text-slate-600 {
+    @apply text-slate-400;
+  }
+  .dark .text-slate-500 {
+    @apply text-slate-400;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-2xl border border-slate-200 bg-white/95 p-5 shadow-soft backdrop-blur md:p-6 dark:border-slate-800 dark:bg-slate-900/90;
+  }
+
+  .stack {
+    @apply flex flex-col gap-3;
+  }
+
+  .row {
+    @apply flex flex-col gap-2 md:flex-row md:items-center md:justify-between;
+  }
+
+  .list {
+    @apply m-0 flex list-none flex-col gap-3 p-0;
+  }
+
+  .field {
+    @apply rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-brand-700/40;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-brand-300 hover:bg-brand-50 focus:outline-none focus:ring-2 focus:ring-brand-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-brand-700 dark:hover:bg-slate-800;
+  }
+
+  .btn-primary {
+    @apply border-brand-600 bg-brand-600 text-white hover:border-brand-700 hover:bg-brand-700;
+  }
+
+  .btn-danger {
+    @apply border-rose-200 bg-rose-50 text-rose-700 hover:border-rose-300 hover:bg-rose-100;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold;
+  }
+
+  .status {
+    @apply badge uppercase tracking-wide;
+  }
+
+  .status-queued {
+    @apply bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-100;
+  }
+
+  .status-running {
+    @apply bg-sky-100 text-sky-700;
+  }
+
+  .status-paused {
+    @apply bg-amber-100 text-amber-700 dark:bg-amber-800/40 dark:text-amber-200;
+  }
+
+  .status-completed {
+    @apply bg-emerald-100 text-emerald-700 dark:bg-emerald-800/40 dark:text-emerald-200;
+  }
+
+  .status-failed {
+    @apply bg-rose-100 text-rose-700 dark:bg-rose-800/40 dark:text-rose-200;
+  }
+
+  .status-canceled {
+    @apply bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-100;
+  }
+
+  .mini-player {
+    @apply fixed bottom-4 left-1/2 z-50 w-[min(980px,calc(100%-1.5rem))] -translate-x-1/2 rounded-2xl border border-slate-700 bg-slate-900/95 px-4 py-3 text-slate-100 shadow-2xl backdrop-blur;
+  }
+
+  .image-viewer {
+    @apply max-h-[70vh] overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-900;
+  }
+
+  .image-viewer img {
+    @apply h-auto w-full rounded-lg object-contain;
+  }
+
+  .pdf-viewer {
+    @apply h-[75vh] w-full rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900;
+  }
+}

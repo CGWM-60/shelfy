@@ -1,0 +1,99 @@
+services:
+  api:
+    image: shelfy-api:latest
+    container_name: shelfy-api
+    environment:
+      APP_ENV: "prod"
+      HTTP_ADDR: ":18080"
+      CONFIG_FILE: ""
+      HTTP_TIMEOUT_SECONDS: "30"
+      DB_DRIVER: "sqlite"
+      DB_DSN: "/data/shelfy.db"
+      STORAGE_PATH: "/data/downloads"
+      MEDIA_PATHS: "/data/downloads,/media"
+      DOWNLOAD_MAX_CONCURRENT: "3"
+      DOWNLOAD_AUTO_RESUME: "true"
+      AI_ENABLED: "true"
+      AI_TOP_K: "5"
+      MISTRAL_API_KEY: ""
+      MISTRAL_EMBED_MODEL: "mistral-embed"
+      MISTRAL_CHAT_MODEL: "mistral-small-latest"
+      DEBRIDLINK_API_BASE: "https://debrid-link.com"
+      DEBRIDLINK_OAUTH_CLIENT_ID: ""
+      DEBRIDLINK_OAUTH_CLIENT_SECRET: ""
+      DEBRIDLINK_OAUTH_SCOPE: "get.account get.post.delete.downloader get.files get.post.stream"
+      FILESERVER_ENABLED: "true"
+      FILESERVER_AUTH_USER: ""
+      FILESERVER_AUTH_PASS: ""
+      DLNA_ENABLED: "true"
+      DLNA_BASE_URL: "http://192.168.1.200:8080"
+      SMB_ENABLED: "false"
+      SMB_SHARE_NAME: "shelfy"
+      SMB_SHARE_PATH: "/data/downloads"
+      SMB_BINARY: "smbd"
+      SMB_STATUS_BINARY: "smbstatus"
+      AUTH_ENABLED: "false"
+      AUTH_USER: ""
+      AUTH_PASS: ""
+      AUTH_SESSION_SECRET: ""
+      AUTH_SESSION_TTL_HOURS: "24"
+    volumes:
+      - /share/Container/shelfy/data:/data
+      - /share/Media:/media:ro
+      - /etc/localtime:/etc/localtime:ro
+    network_mode: host
+    restart: unless-stopped
+
+  worker:
+    image: shelfy-worker:latest
+    container_name: shelfy-worker
+    environment:
+      APP_ENV: "prod"
+      HTTP_ADDR: ":18080"
+      CONFIG_FILE: ""
+      HTTP_TIMEOUT_SECONDS: "30"
+      DB_DRIVER: "sqlite"
+      DB_DSN: "/data/shelfy.db"
+      STORAGE_PATH: "/data/downloads"
+      MEDIA_PATHS: "/data/downloads,/media"
+      DOWNLOAD_MAX_CONCURRENT: "3"
+      DOWNLOAD_AUTO_RESUME: "true"
+      AI_ENABLED: "true"
+      AI_TOP_K: "5"
+      MISTRAL_API_KEY: "eGFajmNXYQlg38tHAHHrjYAlrhnvOL22"
+      MISTRAL_EMBED_MODEL: "mistral-embed"
+      MISTRAL_CHAT_MODEL: "mistral-small-latest"
+      DEBRIDLINK_API_BASE: "https://debrid-link.com"
+      DEBRIDLINK_OAUTH_CLIENT_ID: "bMs32shaby43qVGVKnkRqw"
+      DEBRIDLINK_OAUTH_CLIENT_SECRET: "XRMJ8JNJtJZBsRP8gzBnYc6huLK2cqXay3ihKId9mt4"
+      DEBRIDLINK_OAUTH_SCOPE: "get.account get.post.delete.downloader get.files get.post.stream"
+      FILESERVER_ENABLED: "true"
+      FILESERVER_AUTH_USER: "cangui"
+      FILESERVER_AUTH_PASS: "GHT30k7!"
+      DLNA_ENABLED: "true"
+      DLNA_BASE_URL: "http://192.168.1.200:8080"
+      SMB_ENABLED: "false"
+      SMB_SHARE_NAME: "shelfy"
+      SMB_SHARE_PATH: "/data/downloads"
+      SMB_BINARY: "smbd"
+      SMB_STATUS_BINARY: "smbstatus"
+      AUTH_ENABLED: "false"
+      AUTH_USER: ""
+      AUTH_PASS: ""
+      AUTH_SESSION_SECRET: ""
+      AUTH_SESSION_TTL_HOURS: "24"
+    volumes:
+      - /share/Container/shelfy/data:/data
+      - /share/Media:/media:ro
+      - /etc/localtime:/etc/localtime:ro
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  web:
+    image: shelfy-web:latest
+    container_name: shelfy-web
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      - api

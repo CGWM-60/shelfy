@@ -1,0 +1,442 @@
+openapi: 3.1.0
+info:
+  title: Shelfy API
+  version: 0.2.0
+  description: API JDownloader2-like + Plex-like + Débrideur + IA (Mistral)
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/health:
+    get:
+      summary: Santé de l'API
+      responses:
+        '200': { description: OK }
+  /api/auth/status:
+    get:
+      summary: État de l'authentification session
+      responses:
+        '200': { description: OK }
+  /api/auth/login:
+    post:
+      summary: Login (username/password) et création cookie de session
+      responses:
+        '200': { description: OK }
+        '401': { description: Unauthorized }
+  /api/auth/logout:
+    post:
+      summary: Logout et suppression cookie de session
+      responses:
+        '200': { description: OK }
+  /api/downloads:
+    get:
+      summary: Lister les téléchargements
+      responses:
+        '200': { description: OK }
+    post:
+      summary: Ajouter un ou plusieurs liens (option destinationDir)
+      requestBody:
+        required: true
+      responses:
+        '201': { description: Créé }
+  /api/downloads/{id}/start:
+    post:
+      summary: Démarrer un téléchargement
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: No Content }
+  /api/downloads/{id}/pause:
+    post:
+      summary: Mettre en pause un téléchargement
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: No Content }
+  /api/downloads/{id}/resume:
+    post:
+      summary: Reprendre un téléchargement
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: No Content }
+  /api/downloads/{id}:
+    delete:
+      summary: Supprimer un téléchargement
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: No Content }
+  /api/events:
+    get:
+      summary: SSE des événements (download/debrid/media)
+      responses:
+        '200': { description: text/event-stream }
+
+  /api/debrid/providers:
+    get:
+      summary: Lister les providers débrideur
+      responses:
+        '200': { description: OK }
+  /api/debrid/accounts:
+    get:
+      summary: Lister les comptes débrideur
+      responses:
+        '200': { description: OK }
+    post:
+      summary: Créer un compte débrideur
+      responses:
+        '201': { description: Créé }
+  /api/debrid/accounts/{id}:
+    patch:
+      summary: Modifier un compte débrideur
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: OK }
+    delete:
+      summary: Supprimer un compte débrideur
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '204': { description: No Content }
+  /api/debrid/accounts/{id}/auth/start:
+    post:
+      summary: Démarrer le flow device code
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: OK }
+  /api/debrid/accounts/{id}/auth/poll:
+    post:
+      summary: Poller la validation du flow device code
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: OK }
+  /api/debrid/accounts/{id}/auth/password:
+    post:
+      summary: Authentifier un compte avec login/mot de passe (OAuth2 password grant)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: OK }
+  /api/debrid/accounts/{id}/status:
+    get:
+      summary: Vérifier le statut du token compte
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: OK }
+
+  /api/media/scan:
+    post:
+      summary: Scanner une bibliothèque média
+      responses:
+        '200': { description: OK }
+  /api/media:
+    get:
+      summary: Lister les médias
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: kind
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+  /api/media/{id}:
+    get:
+      summary: Détail d'un média
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+  /api/stream/{id}:
+    get:
+      summary: Stream média (HTTP Range)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+        '206': { description: Partial Content }
+  /api/subtitles/{id}:
+    get:
+      summary: Sous-titres média
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+        '404': { description: Not Found }
+  /api/media/{id}/progress:
+    post:
+      summary: Sauvegarder progression lecture
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: No Content }
+
+  /files/:
+    get:
+      summary: Lister les fichiers streamables (VLC friendly)
+      responses:
+        '200': { description: OK }
+        '401': { description: Unauthorized }
+  /files/{id}/stream:
+    get:
+      summary: Stream direct fichier (HTTP Range)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+        '206': { description: Partial Content }
+        '401': { description: Unauthorized }
+  /files/{id}/download:
+    get:
+      summary: Télécharger un fichier
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+        '401': { description: Unauthorized }
+
+  /api/ai/index:
+    post:
+      summary: Indexer embeddings (médias + downloads)
+      responses:
+        '200': { description: OK }
+  /api/ai/search:
+    post:
+      summary: Recherche sémantique
+      responses:
+        '200': { description: OK }
+  /api/ai/ask:
+    post:
+      summary: Q/A IA avec sources
+      responses:
+        '200': { description: OK }
+  /api/ai/status:
+    get:
+      summary: Statut des providers IA
+      responses:
+        '200': { description: OK }
+  /api/ai/report:
+    get:
+      summary: Rapport de fonctionnement IA (indexation, latence, tokens estimés)
+      responses:
+        '200': { description: OK }
+
+  /api/settings:
+    get:
+      summary: Lire les paramètres applicatifs
+      responses:
+        '200': { description: OK }
+    put:
+      summary: Mettre à jour les paramètres applicatifs
+      responses:
+        '200': { description: OK }
+
+  /api/dlna/devices:
+    get:
+      summary: Lister les clients/appareils connectés au serveur DLNA
+      responses:
+        '200': { description: OK }
+  /api/dlna/scan:
+    post:
+      summary: Actualiser l'état DLNA (et discovery optionnelle)
+      responses:
+        '200': { description: OK }
+        '502': { description: Erreur réseau DLNA }
+  /api/dlna/debug:
+    get:
+      summary: Diagnostic DLNA/SSDP (compteurs M-SEARCH, réponses, derniers événements)
+      responses:
+        '200': { description: OK }
+  /api/smb/status:
+    get:
+      summary: Statut du serveur SMB et clients connectés
+      responses:
+        '200': { description: OK }
+  /api/smb/refresh:
+    post:
+      summary: Rafraîchir l'état SMB
+      responses:
+        '200': { description: OK }
+
+  /dlna/device.xml:
+    get:
+      summary: Description UPnP du serveur DLNA (MediaServer)
+      responses:
+        '200': { description: XML description }
+  /dlna/scpd/content_directory.xml:
+    get:
+      summary: SCPD ContentDirectory
+      responses:
+        '200': { description: XML SCPD }
+  /dlna/scpd/connection_manager.xml:
+    get:
+      summary: SCPD ConnectionManager
+      responses:
+        '200': { description: XML SCPD }
+  /dlna/control/content_directory:
+    post:
+      summary: Contrôle SOAP ContentDirectory (Browse)
+      responses:
+        '200': { description: SOAP BrowseResponse }
+        '500': { description: SOAP Fault }
+  /dlna/control/connection_manager:
+    post:
+      summary: Contrôle SOAP ConnectionManager (GetProtocolInfo...)
+      responses:
+        '200': { description: SOAP Response }
+        '500': { description: SOAP Fault }
+  /dlna/media/{id}:
+    get:
+      summary: Flux média DLNA (HTTP Range)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+        '206': { description: Partial Content }
+
+  /upnp/device.xml:
+    get:
+      summary: Alias UPnP de la description serveur DLNA
+      responses:
+        '200': { description: XML description }
+  /upnp/scpd/content_directory.xml:
+    get:
+      summary: Alias UPnP SCPD ContentDirectory
+      responses:
+        '200': { description: XML SCPD }
+  /upnp/scpd/connection_manager.xml:
+    get:
+      summary: Alias UPnP SCPD ConnectionManager
+      responses:
+        '200': { description: XML SCPD }
+  /upnp/control/content_directory:
+    post:
+      summary: Alias UPnP contrôle SOAP ContentDirectory
+      responses:
+        '200': { description: SOAP BrowseResponse }
+        '500': { description: SOAP Fault }
+  /upnp/control/connection_manager:
+    post:
+      summary: Alias UPnP contrôle SOAP ConnectionManager
+      responses:
+        '200': { description: SOAP Response }
+        '500': { description: SOAP Fault }
+  /upnp/media/{id}:
+    get:
+      summary: Alias UPnP flux média (HTTP Range)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+        '206': { description: Partial Content }
+
+  /api/fs/roots:
+    get:
+      summary: Lister les racines autorisées pour la gestion de fichiers
+      responses:
+        '200': { description: OK }
+  /api/fs/list:
+    get:
+      summary: Lister le contenu d'un dossier autorisé
+      parameters:
+        - in: query
+          name: path
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+  /api/fs/file:
+    get:
+      summary: Lire un fichier texte
+      parameters:
+        - in: query
+          name: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+    put:
+      summary: Créer ou mettre à jour un fichier
+      responses:
+        '204': { description: No Content }
+  /api/fs/mkdir:
+    post:
+      summary: Créer un dossier
+      responses:
+        '204': { description: No Content }
+  /api/fs/move:
+    patch:
+      summary: Déplacer/renommer un fichier ou dossier
+      responses:
+        '204': { description: No Content }
+  /api/fs/item:
+    delete:
+      summary: Supprimer un fichier ou dossier (récursif si dossier)
+      parameters:
+        - in: query
+          name: path
+          required: true
+          schema: { type: string }
+        - in: query
+          name: recursive
+          schema: { type: boolean }
+      responses:
+        '204': { description: No Content }

@@ -1,0 +1,107 @@
+services:
+  api:
+    container_name: shelfy-api
+    build:
+      context: ../..
+      dockerfile: deploy/qnap/Dockerfile.api
+    environment:
+      APP_ENV: prod
+      HTTP_ADDR: :8080
+      CONFIG_FILE: ""
+      HTTP_TIMEOUT_SECONDS: "30"
+      DB_DRIVER: sqlite
+      DB_DSN: /data/shelfy.db
+      STORAGE_PATH: /data/downloads
+      MEDIA_PATHS: /data/downloads,/media
+      DOWNLOAD_MAX_CONCURRENT: "3"
+      DOWNLOAD_AUTO_RESUME: "true"
+      AI_ENABLED: "true"
+      AI_TOP_K: "5"
+      MISTRAL_API_KEY: ""
+      MISTRAL_EMBED_MODEL: mistral-embed
+      MISTRAL_CHAT_MODEL: mistral-small-latest
+      DEBRIDLINK_API_BASE: https://debrid-link.com
+      DEBRIDLINK_OAUTH_CLIENT_ID: ""
+      DEBRIDLINK_OAUTH_CLIENT_SECRET: ""
+      DEBRIDLINK_OAUTH_SCOPE: get.account get.post.delete.downloader get.files get.post.stream
+      FILESERVER_ENABLED: "true"
+      FILESERVER_AUTH_USER: ""
+      FILESERVER_AUTH_PASS: ""
+      DLNA_ENABLED: "false"
+      DLNA_BASE_URL: ""
+      SMB_ENABLED: "false"
+      SMB_SHARE_NAME: shelfy
+      SMB_SHARE_PATH: /data/downloads
+      SMB_BINARY: smbd
+      SMB_STATUS_BINARY: smbstatus
+      AUTH_ENABLED: "true"
+      AUTH_USER: admin
+      AUTH_PASS: change-me
+      AUTH_SESSION_SECRET: change-me-long-random-secret
+      AUTH_SESSION_TTL_HOURS: "24"
+    volumes:
+      - shelfy_data:/data
+      - shelfy_media:/media:ro
+    restart: unless-stopped
+
+  worker:
+    container_name: shelfy-worker
+    build:
+      context: ../..
+      dockerfile: deploy/qnap/Dockerfile.worker
+    environment:
+      APP_ENV: prod
+      HTTP_ADDR: :8080
+      CONFIG_FILE: ""
+      HTTP_TIMEOUT_SECONDS: "30"
+      DB_DRIVER: sqlite
+      DB_DSN: /data/shelfy.db
+      STORAGE_PATH: /data/downloads
+      MEDIA_PATHS: /data/downloads,/media
+      DOWNLOAD_MAX_CONCURRENT: "3"
+      DOWNLOAD_AUTO_RESUME: "true"
+      AI_ENABLED: "true"
+      AI_TOP_K: "5"
+      MISTRAL_API_KEY: ""
+      MISTRAL_EMBED_MODEL: mistral-embed
+      MISTRAL_CHAT_MODEL: mistral-small-latest
+      DEBRIDLINK_API_BASE: https://debrid-link.com
+      DEBRIDLINK_OAUTH_CLIENT_ID: ""
+      DEBRIDLINK_OAUTH_CLIENT_SECRET: ""
+      DEBRIDLINK_OAUTH_SCOPE: get.account get.post.delete.downloader get.files get.post.stream
+      FILESERVER_ENABLED: "true"
+      FILESERVER_AUTH_USER: ""
+      FILESERVER_AUTH_PASS: ""
+      DLNA_ENABLED: "false"
+      DLNA_BASE_URL: ""
+      SMB_ENABLED: "false"
+      SMB_SHARE_NAME: shelfy
+      SMB_SHARE_PATH: /data/downloads
+      SMB_BINARY: smbd
+      SMB_STATUS_BINARY: smbstatus
+      AUTH_ENABLED: "true"
+      AUTH_USER: admin
+      AUTH_PASS: change-me
+      AUTH_SESSION_SECRET: change-me-long-random-secret
+      AUTH_SESSION_TTL_HOURS: "24"
+    volumes:
+      - shelfy_data:/data
+      - shelfy_media:/media:ro
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  web:
+    container_name: shelfy-web
+    build:
+      context: ../..
+      dockerfile: deploy/dokploy/Dockerfile.web
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+    depends_on:
+      - api
+
+volumes:
+  shelfy_data:
+  shelfy_media:

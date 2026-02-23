@@ -1,0 +1,103 @@
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+import { APIProvider } from '../api/context'
+import { createMockClient } from '../test/mockClient'
+import { DownloadsPage } from './DownloadsPage'
+
+class MockEventSource {
+  static instances: MockEventSource[] = []
+
+  url: string
+  listeners: Record<string, Array<(event: MessageEvent) => void>> = {}
+
+  constructor(url: string) {
+    this.url = url
+    MockEventSource.instances.push(this)
+  }
+
+  addEventListener(type: string, listener: (event: MessageEvent) => void) {
+    if (!this.listeners[type]) {
+      this.listeners[type] = []
+    }
+    this.listeners[type].push(listener)
+  }
+
+  close() {}
+
+  emit(type: string, payload: unknown) {
+    const handlers = this.listeners[type] ?? []
+    for (const handler of handlers) {
+      handler({ data: JSON.stringify(payload) } as MessageEvent)
+    }
+  }
+}
+
+test('affiche les jobs et ajoute un téléchargement', async () => {
+  const client = createMockClient()
+  client.listDownloads = vi.fn().mockResolvedValue([{ id: 'd1', sourceLink: 'a', directLink: 'a', fileName: 'a.bin', status: 'queued', downloadedBytes: 0, sizeBytes: 0, speedBytes: 0, etaSeconds: 0, useDebrid: false }])
+
+  render(
+    <APIProvider client={client}>
+      <MemoryRouter>
+        <DownloadsPage />
+      </MemoryRouter>
+    </APIProvider>
+  )
+
+  expect(await screen.findByText('a.bin')).toBeInTheDocument()
+  fireEvent.change(screen.getByPlaceholderText('Collez un ou plusieurs liens'), { target: { value: 'https://x.test/file.bin' } })
+  fireEvent.change(screen.getByPlaceholderText('Dossier destination (optionnel)'), { target: { value: '/tmp/media' } })
+  fireEvent.click(screen.getByText('Ajouter'))
+
+  await waitFor(() => expect(client.addDownloads).toHaveBeenCalled())
+  expect(client.addDownloads).toHaveBeenCalledWith(expect.objectContaining({ destinationDir: '/tmp/media' }))
+})
+
+test('met à jour la progression en temps réel via SSE', async () => {
+  const originalEventSource = globalThis.EventSource
+  MockEventSource.instances = []
+  globalThis.EventSource = MockEventSource as unknown as typeof EventSource
+  try {
+    const client = createMockClient()
+    client.listDownloads = vi.fn().mockResolvedValue([
+      {
+        id: 'd1',
+        sourceLink: 'a',
+        directLink: 'a',
+        fileName: 'a.bin',
+        status: 'running',
+        downloadedBytes: 0,
+        sizeBytes: 4096,
+        speedBytes: 0,
+        etaSeconds: 0,
+        useDebrid: false
+      }
+    ])
+
+    render(
+      <APIProvider client={client}>
+        <MemoryRouter>
+          <DownloadsPage />
+        </MemoryRouter>
+      </APIProvider>
+    )
+
+    expect(await screen.findByText('a.bin')).toBeInTheDocument()
+    expect(MockEventSource.instances[0]?.url).toBe('/api/events')
+
+    await act(async () => {
+      MockEventSource.instances[0].emit('download_progress', {
+        id: 'd1',
+        downloadedBytes: 2048,
+        sizeBytes: 4096,
+        speedBytes: 1024,
+        etaSeconds: 2
+      })
+    })
+
+    await waitFor(() => expect(screen.getByText('2 Ko / 4 Ko')).toBeInTheDocument())
+    expect(screen.getByText('vitesse 1 Ko/s')).toBeInTheDocument()
+  } finally {
+    globalThis.EventSource = originalEventSource
+  }
+})
