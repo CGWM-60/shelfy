@@ -51,7 +51,8 @@ func main() {
 	r := repo.NewGormRepository(db)
 	bus := events.NewBus()
 	httpc := httpclient.New(cfg.RequestTimeout)
-	engine := downloader.NewEngine(r, httpc, storage.LocalFS{}, bus, log, cfg.StoragePath)
+	downloadHTTP := httpclient.NewStreaming(cfg.RequestTimeout)
+	engine := downloader.NewEngine(r, downloadHTTP, storage.LocalFS{}, bus, log, cfg.StoragePath)
 	engine.Configure(cfg.DownloadMaxConcurrent, cfg.DownloadAutoResume)
 	if err := engine.Recover(context.Background()); err != nil {
 		log.Error().Err(err).Msg("recover downloads")

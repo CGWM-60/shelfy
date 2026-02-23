@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
@@ -190,6 +191,79 @@ func TestEngineCallsCompletedHook(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	t.Fatalf("expected completed hook to be called")
+}
+
+func TestEngineRangeFallbackRestartsFileWhenRangeIgnored(t *testing.T) {
+	repo := testutil.NewSQLiteRepo(t)
+	const body = "NEW-DATA-FROM-SERVER"
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Intentionally ignore Range and always return 200.
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(body))
+	}))
+	defer ts.Close()
+
+	downloadDir := filepath.Join(t.TempDir(), "downloads")
+	dest := filepath.Join(downloadDir, "file.bin")
+	if err := os.MkdirAll(downloadDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(dest, []byte("OLD-PARTIAL"), 0o644); err != nil {
+		t.Fatalf("write old partial: %v", err)
+	}
+
+	job := domain.DownloadJob{
+		ID:              "range-fallback",
+		SourceLink:      ts.URL + "/file.bin",
+		FileName:        "file.bin",
+		DestinationPath: dest,
+		Status:          domain.DownloadQueued,
+		MaxRetries:      1,
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
+	}
+	if err := repo.CreateDownload(context.Background(), job); err != nil {
+		t.Fatalf("create job: %v", err)
+	}
+
+	engine := NewEngine(repo, httpclient.New(5*time.Second), storage.LocalFS{}, events.NewBus(), logger.NewJSONLogger(nil), downloadDir)
+	if err := engine.Start(context.Background(), job.ID); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+
+	waitForStatus(t, repo, job.ID, domain.DownloadCompleted)
+	got, err := os.ReadFile(dest)
+	if err != nil {
+		t.Fatalf("read final file: %v", err)
+	}
+	if string(got) != body {
+		t.Fatalf("unexpected final file content: %q", string(got))
+	}
+}
+
+func TestParseContentRangeTotal(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		raw   string
+		total int64
+		ok    bool
+	}{
+		{name: "partial format", raw: "bytes 10-19/100", total: 100, ok: true},
+		{name: "star total", raw: "bytes */1000", total: 1000, ok: true},
+		{name: "invalid", raw: "invalid", total: 0, ok: false},
+	}
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got, ok := parseContentRangeTotal(tc.raw)
+			if ok != tc.ok || got != tc.total {
+				t.Fatalf("parseContentRangeTotal(%q) = (%d, %v), want (%d, %v)", tc.raw, got, ok, tc.total, tc.ok)
+			}
+		})
+	}
 }
 
 func waitForStatus(t *testing.T, repo interface {

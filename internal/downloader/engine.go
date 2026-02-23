@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -275,12 +276,13 @@ func (e *Engine) downloadOnce(ctx context.Context, job *domain.DownloadJob) erro
 	if info, err := e.fs.Stat(job.DestinationPath); err == nil {
 		currentSize = info.Size()
 	}
+	requestedResume := currentSize > 0
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlToDownload, nil)
 	if err != nil {
 		return err
 	}
-	if currentSize > 0 {
+	if requestedResume {
 		req.Header.Set("Range", fmt.Sprintf("bytes=%d-", currentSize))
 	}
 
@@ -294,19 +296,38 @@ func (e *Engine) downloadOnce(ctx context.Context, job *domain.DownloadJob) erro
 		return fmt.Errorf("http status %d", resp.StatusCode)
 	}
 
-	file, err := e.fs.OpenFile(job.DestinationPath, os.O_CREATE|os.O_WRONLY, 0o644)
+	resumeAccepted := requestedResume && resp.StatusCode == http.StatusPartialContent
+	if requestedResume && !resumeAccepted {
+		// Server ignored Range; restart cleanly to avoid appending duplicate data.
+		currentSize = 0
+	}
+
+	openFlags := os.O_CREATE | os.O_WRONLY
+	if !resumeAccepted {
+		openFlags |= os.O_TRUNC
+	}
+	file, err := e.fs.OpenFile(job.DestinationPath, openFlags, 0o644)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	if _, err := file.Seek(currentSize, io.SeekStart); err != nil {
-		return err
+	if resumeAccepted {
+		if _, err := file.Seek(currentSize, io.SeekStart); err != nil {
+			return err
+		}
 	}
 
-	total := currentSize + resp.ContentLength
-	if resp.ContentLength < 0 {
-		total = 0
+	total := int64(0)
+	if resp.ContentLength >= 0 {
+		if resumeAccepted {
+			total = currentSize + resp.ContentLength
+		} else {
+			total = resp.ContentLength
+		}
+	}
+	if headerTotal, ok := parseContentRangeTotal(resp.Header.Get("Content-Range")); ok {
+		total = headerTotal
 	}
 
 	buf := make([]byte, 256*1024)
@@ -386,4 +407,24 @@ func max(a, b float64) float64 {
 		return a
 	}
 	return b
+}
+
+func parseContentRangeTotal(raw string) (int64, bool) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return 0, false
+	}
+	parts := strings.Split(value, "/")
+	if len(parts) != 2 {
+		return 0, false
+	}
+	totalPart := strings.TrimSpace(parts[1])
+	if totalPart == "" || totalPart == "*" {
+		return 0, false
+	}
+	total, err := strconv.ParseInt(totalPart, 10, 64)
+	if err != nil || total < 0 {
+		return 0, false
+	}
+	return total, true
 }

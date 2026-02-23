@@ -31,6 +31,19 @@ Tu peux surcharger avec:
 make dev FRONTEND_HOST=0.0.0.0 FRONTEND_PORT=4173
 ```
 
+Mode production (Docker Compose Dokploy):
+```bash
+make prod
+```
+Arrêt:
+```bash
+make prod-down
+```
+Logs:
+```bash
+make prod-logs
+```
+
 ## Configuration (priorité)
 1. Variables d'env
 2. Fichier `config.json` (ou `CONFIG_FILE=/chemin/config.json`)

@@ -58,7 +58,7 @@ func setupEnv(t *testing.T) *env {
 	}
 	r := repo.NewGormRepository(db)
 	bus := events.NewBus()
-	engine := downloader.NewEngine(r, httpclient.New(10*time.Second), storage.LocalFS{}, bus, logger.NewJSONLogger(nil), filepath.Join(root, "downloads"))
+	engine := downloader.NewEngine(r, httpclient.NewStreaming(10*time.Second), storage.LocalFS{}, bus, logger.NewJSONLogger(nil), filepath.Join(root, "downloads"))
 	registry := debrid.NewRegistry()
 	registry.Register(fakeprovider.New())
 	debridSvc := debrid.NewService(r, registry)
@@ -130,7 +130,7 @@ func TestDownloadPauseResumeRestart(t *testing.T) {
 		t.Fatalf("expected partial bytes")
 	}
 
-	newEngine := downloader.NewEngine(env.repo, httpclient.New(10*time.Second), storage.LocalFS{}, env.bus, logger.NewJSONLogger(nil), env.storage)
+	newEngine := downloader.NewEngine(env.repo, httpclient.NewStreaming(10*time.Second), storage.LocalFS{}, env.bus, logger.NewJSONLogger(nil), env.storage)
 	if err := newEngine.Recover(context.Background()); err != nil {
 		t.Fatalf("recover: %v", err)
 	}

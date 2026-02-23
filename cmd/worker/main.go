@@ -30,7 +30,7 @@ func main() {
 	}
 
 	r := repo.NewGormRepository(db)
-	engine := downloader.NewEngine(r, httpclient.New(cfg.RequestTimeout), storage.LocalFS{}, events.NewBus(), log, cfg.StoragePath)
+	engine := downloader.NewEngine(r, httpclient.NewStreaming(cfg.RequestTimeout), storage.LocalFS{}, events.NewBus(), log, cfg.StoragePath)
 	engine.Configure(cfg.DownloadMaxConcurrent, cfg.DownloadAutoResume)
 	if err := engine.Recover(context.Background()); err != nil {
 		log.Error().Err(err).Msg("recover")

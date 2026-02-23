@@ -1,7 +1,8 @@
-.PHONY: deps dev dev-api dev-worker test-back test-front e2e lint test ci
+.PHONY: deps dev dev-api dev-worker test-back test-front e2e lint test ci prod prod-down prod-logs
 
 FRONTEND_HOST ?= 0.0.0.0
 FRONTEND_PORT ?= 5173
+PROD_COMPOSE_FILE ?= deploy/dokploy/docker-compose.dokploy.yml
 
 deps:
 	go mod tidy
@@ -67,3 +68,12 @@ lint:
 test: lint test-back test-front
 
 ci: lint test-back test-front e2e
+
+prod:
+	docker compose -f $(PROD_COMPOSE_FILE) up -d --build
+
+prod-down:
+	docker compose -f $(PROD_COMPOSE_FILE) down --remove-orphans
+
+prod-logs:
+	docker compose -f $(PROD_COMPOSE_FILE) logs -f --tail=200
