@@ -282,17 +282,19 @@ export function LibraryPage() {
   }
 
   async function moveEntryToParent(entry: FSManagedEntry) {
-    const parent = parentPath(entry.path)
-    if (!parent || parent === entry.path) return
+    const containerPath = parentPath(entry.path)
+    if (!containerPath || containerPath === entry.path) return
+    const targetParent = parentPath(containerPath)
+    if (!targetParent || targetParent === containerPath) return
     const root = pickRootForPath(entry.path, roots)
-    if (root && !isWithinRoot(root, parent)) return
-    const toPath = joinPath(parent, entry.name)
+    if (root && !isWithinRoot(root, targetParent)) return
+    const toPath = joinPath(targetParent, entry.name)
     if (toPath === entry.path) return
     setError('')
     try {
       await api.moveFSPath(entry.path, toPath)
       setLastMove({ from: entry.path, to: toPath })
-      setToast(`Déplacé vers ${parent}`)
+      setToast(`Déplacé vers ${targetParent}`)
       await refreshAll(currentPath)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Déplacement impossible')
@@ -309,6 +311,28 @@ export function LibraryPage() {
       await refreshAll(currentPath)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Impossible d’annuler le déplacement')
+    }
+  }
+
+  async function moveCurrentFolderToParent() {
+    if (!currentPath) return
+    const root = pickRootForPath(currentPath, roots)
+    if (!root || currentPath === root) return
+    const containerPath = parentPath(currentPath)
+    if (!containerPath || containerPath === currentPath) return
+    const targetParent = parentPath(containerPath)
+    if (!targetParent || targetParent === containerPath) return
+    if (!isWithinRoot(root, targetParent)) return
+    const targetPath = joinPath(targetParent, basename(currentPath))
+    if (targetPath === currentPath) return
+    setError('')
+    try {
+      await api.moveFSPath(currentPath, targetPath)
+      setLastMove({ from: currentPath, to: targetPath })
+      setToast(`Dossier remonté vers ${targetParent}`)
+      await refreshAll(targetPath)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Déplacement impossible')
     }
   }
 
@@ -403,6 +427,16 @@ export function LibraryPage() {
   const currentRoot = useMemo(() => pickRootForPath(currentPath, roots), [currentPath, roots])
   const breadcrumbs = useMemo(() => buildBreadcrumbs(currentPath, roots), [currentPath, roots])
   const canGoUp = currentPath && parentPath(currentPath) !== currentPath
+  const canMoveCurrentFolderUp = useMemo(() => {
+    if (!currentPath) return false
+    const root = pickRootForPath(currentPath, roots)
+    if (!root || currentPath === root) return false
+    const containerPath = parentPath(currentPath)
+    if (!containerPath || containerPath === currentPath) return false
+    const targetParent = parentPath(containerPath)
+    if (!targetParent || targetParent === containerPath) return false
+    return isWithinRoot(root, targetParent)
+  }, [currentPath, roots])
   const contextTargetDir = useMemo(() => {
     if (!contextMenu) return ''
     if (contextMenu.entry.isDir) return contextMenu.entry.path
@@ -518,6 +552,14 @@ export function LibraryPage() {
             </label>
           </div>
 
+          {canMoveCurrentFolderUp ? (
+            <div>
+              <button className="btn" onClick={() => void moveCurrentFolderToParent()}>
+                Remonter ce dossier d’un cran
+              </button>
+            </div>
+          ) : null}
+
           <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-600">
             {moveModeEnabled ? 'Déplace par glisser-déposer ou via "Déplacer au parent".' : 'Le glisser-déposer est désactivé (active "Mode déplacement").'}
             {currentRoot ? ` Racine active: ${currentRoot}` : ''}
@@ -552,8 +594,9 @@ export function LibraryPage() {
             <ul className="m-0 list-none p-0">
               {filteredEntries.map((entry) => {
                 const mediaItem = mediaByPath[entry.path]
-                const parent = parentPath(entry.path)
-                const canMoveUp = Boolean(currentRoot) && parent !== entry.path && isWithinRoot(currentRoot || '', parent)
+                const containerPath = parentPath(entry.path)
+                const targetParent = parentPath(containerPath)
+                const canMoveUp = Boolean(currentRoot) && containerPath !== entry.path && targetParent !== containerPath && isWithinRoot(currentRoot || '', targetParent)
                 return (
                   <li
                     key={entry.path}

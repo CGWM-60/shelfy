@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { APIProvider } from '../api/context'
 import { createMockClient } from '../test/mockClient'
@@ -181,4 +181,87 @@ test('menu clic droit: couper puis coller dans un dossier', async () => {
   fireEvent.click(await screen.findByRole('menuitem', { name: /Coller ici/ }))
 
   await waitFor(() => expect(client.moveFSPath).toHaveBeenCalledWith('/tmp/media/episode1.mkv', '/tmp/media/Series/episode1.mkv'))
+})
+
+test('déplacer au parent fonctionne depuis un sous-dossier et est absent à la racine', async () => {
+  const client = createMockClient()
+  client.getFSRoots = vi.fn().mockResolvedValue({ roots: ['/tmp/media'] })
+  client.listFS = vi.fn().mockImplementation(async (path?: string) => {
+    if (!path || path === '/tmp/media') {
+      return {
+        path: '/tmp/media',
+        items: [
+          { name: 'Series', path: '/tmp/media/Series', isDir: true, sizeBytes: 0, modifiedAt: new Date().toISOString() }
+        ]
+      }
+    }
+    if (path === '/tmp/media/Series') {
+      return {
+        path: '/tmp/media/Series',
+        items: [
+          { name: 'episode1.mkv', path: '/tmp/media/Series/episode1.mkv', isDir: false, sizeBytes: 2000, modifiedAt: new Date().toISOString() }
+        ]
+      }
+    }
+    return { path: path || '/tmp/media', items: [] }
+  })
+  client.listMedia = vi.fn().mockResolvedValue([])
+
+  render(
+    <APIProvider client={client}>
+      <MemoryRouter>
+        <LibraryPage />
+      </MemoryRouter>
+    </APIProvider>
+  )
+
+  expect(await screen.findByTestId('library-entry-Series')).toBeInTheDocument()
+  expect(screen.queryByText('Déplacer au parent')).not.toBeInTheDocument()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Ouvrir' }))
+  expect(await screen.findByTestId('library-entry-episode1.mkv')).toBeInTheDocument()
+  fireEvent.click(screen.getByText('Déplacer au parent'))
+
+  await waitFor(() => expect(client.moveFSPath).toHaveBeenCalledWith('/tmp/media/Series/episode1.mkv', '/tmp/media/episode1.mkv'))
+})
+
+test('remonter le dossier courant d’un cran', async () => {
+  const client = createMockClient()
+  client.getFSRoots = vi.fn().mockResolvedValue({ roots: ['/tmp/media'] })
+  client.listFS = vi.fn().mockImplementation(async (path?: string) => {
+    if (!path || path === '/tmp/media') {
+      return {
+        path: '/tmp/media',
+        items: [
+          { name: 'Series', path: '/tmp/media/Series', isDir: true, sizeBytes: 0, modifiedAt: new Date().toISOString() }
+        ]
+      }
+    }
+    if (path === '/tmp/media/Series') {
+      return {
+        path: '/tmp/media/Series',
+        items: [
+          { name: 'Season1', path: '/tmp/media/Series/Season1', isDir: true, sizeBytes: 0, modifiedAt: new Date().toISOString() }
+        ]
+      }
+    }
+    return { path: path || '/tmp/media', items: [] }
+  })
+  client.listMedia = vi.fn().mockResolvedValue([])
+
+  render(
+    <APIProvider client={client}>
+      <MemoryRouter>
+        <LibraryPage />
+      </MemoryRouter>
+    </APIProvider>
+  )
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Ouvrir' }))
+  const seasonRow = await screen.findByTestId('library-entry-Season1')
+  fireEvent.click(within(seasonRow).getByRole('button', { name: 'Ouvrir' }))
+  expect(await screen.findByText(/Remonter ce dossier d/)).toBeInTheDocument()
+  fireEvent.click(screen.getByText(/Remonter ce dossier d/))
+
+  await waitFor(() => expect(client.moveFSPath).toHaveBeenCalledWith('/tmp/media/Series/Season1', '/tmp/media/Season1'))
 })
