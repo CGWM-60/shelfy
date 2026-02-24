@@ -18,11 +18,21 @@ dev:
 				case "$$line" in *=*) ;; *) continue ;; esac; \
 				key=$${line%%=*}; \
 				val=$${line#*=}; \
-				key=$${key##[[:space:]]}; \
-				key=$${key%%[[:space:]]}; \
+				key=$${key#"$${key%%[![:space:]]*}"}; \
+				key=$${key%"$${key##*[![:space:]]}"}; \
+				val=$${val%$$'\r'}; \
+				val=$${val#"$${val%%[![:space:]]*}"}; \
+				val=$${val%"$${val##*[![:space:]]}"}; \
 				[[ "$$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$$ ]] || continue; \
-				if [[ "$$val" =~ ^\".*\"$$ ]]; then val=$${val:1:$${#val}-2}; fi; \
-				if [[ "$$val" =~ ^'\''.*'\''$$ ]]; then val=$${val:1:$${#val}-2}; fi; \
+				if [[ "$$val" =~ ^\".*\"$$ ]]; then \
+					val=$${val:1:$${#val}-2}; \
+				elif [[ "$$val" =~ ^'\''.*'\''$$ ]]; then \
+					val=$${val:1:$${#val}-2}; \
+				else \
+					val=$${val%%#*}; \
+					val=$${val#"$${val%%[![:space:]]*}"}; \
+					val=$${val%"$${val##*[![:space:]]}"}; \
+				fi; \
 				export "$$key=$$val"; \
 			done < .env; \
 		}; \

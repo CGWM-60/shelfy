@@ -384,6 +384,7 @@ func getOrDefault(key, fallback string) string {
 }
 
 func parsePositiveInt(raw string) (int, bool) {
+	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return 0, false
 	}
@@ -395,6 +396,7 @@ func parsePositiveInt(raw string) (int, bool) {
 }
 
 func parseBool(raw string) (bool, bool) {
+	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return false, false
 	}
