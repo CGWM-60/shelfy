@@ -6,9 +6,10 @@ cd "$ROOT_DIR"
 
 FRONTEND_HOST="${FRONTEND_HOST:-0.0.0.0}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
-API_LOG="${API_LOG:-/tmp/shelfy-api.log}"
-WORKER_LOG="${WORKER_LOG:-/tmp/shelfy-worker.log}"
-FRONT_LOG="${FRONT_LOG:-/tmp/shelfy-front.log}"
+LOG_DIR="${LOG_DIR:-$ROOT_DIR/logs}"
+API_LOG="${API_LOG:-$LOG_DIR/shelfy-api.log}"
+WORKER_LOG="${WORKER_LOG:-$LOG_DIR/shelfy-worker.log}"
+FRONT_LOG="${FRONT_LOG:-$LOG_DIR/shelfy-front.log}"
 API_READY_TIMEOUT_SECONDS="${API_READY_TIMEOUT_SECONDS:-180}"
 
 load_dotenv() {
@@ -68,10 +69,24 @@ is_running() {
   kill -0 "$1" 2>/dev/null
 }
 
+is_port_listening() {
+  local port="$1"
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltn 2>/dev/null | awk -v p=":${port}" '$4 ~ p"$" {found=1} END {exit(found?0:1)}'
+    return $?
+  fi
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1
+    return $?
+  fi
+  return 1
+}
+
 wait_for_api() {
-  local health_url="$1"
-  local retries="$2"
-  local sleep_s="${3:-0.5}"
+  local api_port="$1"
+  local primary_health_url="$2"
+  local retries="$3"
+  local sleep_s="${4:-0.5}"
   local i
   for ((i = 1; i <= retries; i++)); do
     if ! is_running "$api_pid"; then
@@ -80,13 +95,19 @@ wait_for_api() {
       return 1
     fi
     if command -v curl >/dev/null 2>&1; then
-      if curl -fsS "$health_url" >/dev/null 2>&1; then
+      if curl -fsS "$primary_health_url" >/dev/null 2>&1; then
         return 0
       fi
     fi
+    if is_port_listening "$api_port"; then
+      return 0
+    fi
     sleep "$sleep_s"
   done
-  echo "API non prête sur $health_url après attente."
+  echo "API non prête sur $primary_health_url après attente."
+  if is_port_listening "$api_port"; then
+    echo "Le port ${api_port} écoute, mais /api/health n'a pas répondu."
+  fi
   tail -n 80 "$API_LOG" || true
   return 1
 }
@@ -116,15 +137,28 @@ if [ "$db_driver" = "sqlite" ]; then
 fi
 
 api_port="${HTTP_ADDR:-:8080}"
-api_port="${api_port##*:}"
-health_url="http://127.0.0.1:${api_port}/api/health"
+api_host="127.0.0.1"
+if [[ "$api_port" == \[*\]:* ]]; then
+  api_host="${api_port%%]*}"
+  api_host="${api_host#[}"
+  api_port="${api_port##*:}"
+elif [[ "$api_port" == *:* && "$api_port" != :* ]]; then
+  api_host="${api_port%:*}"
+  api_port="${api_port##*:}"
+elif [[ "$api_port" == :* ]]; then
+  api_port="${api_port##*:}"
+fi
+if [ -z "$api_host" ] || [ "$api_host" = "0.0.0.0" ] || [ "$api_host" = "::" ] || [ "$api_host" = "[::]" ]; then
+  api_host="127.0.0.1"
+fi
+health_url="http://${api_host}:${api_port}/api/health"
 front_port="${FRONTEND_PORT}"
 api_retries=$((API_READY_TIMEOUT_SECONDS * 2))
 
 check_port_free "$api_port" "api" || exit 1
 check_port_free "$front_port" "frontend" || exit 1
 
-mkdir -p /tmp
+mkdir -p "$LOG_DIR"
 : >"$API_LOG"
 : >"$WORKER_LOG"
 : >"$FRONT_LOG"
@@ -141,7 +175,7 @@ go run ./cmd/api >>"$API_LOG" 2>&1 &
 api_pid=$!
 
 echo "Attente API sur $health_url ..."
-wait_for_api "$health_url" "$api_retries"
+wait_for_api "$api_port" "$health_url" "$api_retries"
 
 echo "Démarrage Worker..."
 go run ./cmd/worker >>"$WORKER_LOG" 2>&1 &
