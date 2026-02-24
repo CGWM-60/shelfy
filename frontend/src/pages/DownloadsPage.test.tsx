@@ -145,3 +145,56 @@ test("affiche la raison d'échec en temps réel via SSE", async () => {
     globalThis.EventSource = originalEventSource
   }
 })
+
+test('affiche host + retries + prochaine tentative sur event retry', async () => {
+  const originalEventSource = globalThis.EventSource
+  MockEventSource.instances = []
+  globalThis.EventSource = MockEventSource as unknown as typeof EventSource
+  try {
+    const client = createMockClient()
+    client.listDownloads = vi.fn().mockResolvedValue([
+      {
+        id: 'd-retry',
+        sourceLink: 'https://source.example.test/file.bin',
+        directLink: 'https://cdn.example.test/file.bin',
+        fileName: 'retry.bin',
+        status: 'running',
+        downloadedBytes: 0,
+        sizeBytes: 4096,
+        speedBytes: 0,
+        etaSeconds: 0,
+        useDebrid: false,
+        retries: 0,
+        maxRetries: 3
+      }
+    ])
+
+    render(
+      <APIProvider client={client}>
+        <MemoryRouter>
+          <DownloadsPage />
+        </MemoryRouter>
+      </APIProvider>
+    )
+
+    expect(await screen.findByText('retry.bin')).toBeInTheDocument()
+    expect(screen.getByText('Hôte cdn.example.test')).toBeInTheDocument()
+    expect(screen.getByText('Retry 0/3')).toBeInTheDocument()
+
+    await act(async () => {
+      MockEventSource.instances[0].emit('download_retry', {
+        id: 'd-retry',
+        retry: 1,
+        retryMax: 3,
+        nextRetryInMs: 1500,
+        error: 'temporary gateway error'
+      })
+    })
+
+    await waitFor(() => expect(screen.getByText('Retry 1/3')).toBeInTheDocument())
+    expect(screen.getByText('Prochaine tentative 2s')).toBeInTheDocument()
+    expect(screen.getByText('Raison: temporary gateway error')).toBeInTheDocument()
+  } finally {
+    globalThis.EventSource = originalEventSource
+  }
+})

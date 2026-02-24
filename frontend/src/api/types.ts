@@ -12,6 +12,9 @@ export interface DownloadJob {
   etaSeconds: number
   useDebrid: boolean
   errorMessage?: string
+  retries?: number
+  maxRetries?: number
+  nextRetryInMs?: number
 }
 
 export interface DebridProvider {

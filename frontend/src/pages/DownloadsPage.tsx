@@ -25,6 +25,34 @@ function readPayloadString(payload: Record<string, unknown>, key: string): strin
   return typeof value === 'string' ? value : ''
 }
 
+function readPayloadNumber(payload: Record<string, unknown>, key: string): number | undefined {
+  const value = payload[key]
+  if (typeof value !== 'number' || Number.isNaN(value)) return undefined
+  return value
+}
+
+function jobHost(job: DownloadJob): string {
+  const candidate = job.directLink || job.sourceLink
+  try {
+    const parsed = new URL(candidate)
+    return parsed.host || '-'
+  } catch {
+    return '-'
+  }
+}
+
+function retryLabel(job: DownloadJob): string {
+  const retry = job.retries ?? 0
+  const max = job.maxRetries ?? 0
+  return `${retry}/${max}`
+}
+
+function nextRetryLabel(job: DownloadJob): string {
+  const ms = job.nextRetryInMs ?? 0
+  if (!ms || ms <= 0) return '-'
+  return `${Math.ceil(ms / 1000)}s`
+}
+
 const eventsBaseURL = import.meta.env.VITE_API_BASE ?? ''
 const eventsURL = eventsBaseURL ? `${eventsBaseURL}/api/events` : '/api/events'
 
@@ -103,6 +131,7 @@ export function DownloadsPage() {
           next.errorMessage = eventError || next.errorMessage || 'Échec sans détail'
         } else if (status === 'running' || status === 'queued' || status === 'completed') {
           next.errorMessage = ''
+          next.nextRetryInMs = 0
         }
         return next
       }))
@@ -136,10 +165,20 @@ export function DownloadsPage() {
       const payload = parseSSEData(event)
       const id = String(payload.id ?? '')
       const eventError = readPayloadString(payload, 'error') || readPayloadString(payload, 'errorMessage')
+      const retry = readPayloadNumber(payload, 'retry')
+      const retryMax = readPayloadNumber(payload, 'retryMax')
+      const nextRetryInMs = readPayloadNumber(payload, 'nextRetryInMs')
       if (!id) return
       setJobs((prev) => prev.map((job) => (
         job.id === id
-          ? { ...job, status: 'running', errorMessage: eventError || job.errorMessage || '' }
+          ? {
+              ...job,
+              status: 'running',
+              errorMessage: eventError || job.errorMessage || '',
+              retries: retry ?? job.retries,
+              maxRetries: retryMax ?? job.maxRetries,
+              nextRetryInMs: nextRetryInMs ?? job.nextRetryInMs
+            }
           : job
       )))
     }
@@ -315,6 +354,11 @@ export function DownloadsPage() {
               <small>{asKB(job.downloadedBytes)} / {asKB(job.sizeBytes)}</small>
               <small>vitesse {asKB(job.speedBytes)}/s</small>
               <small>ETA {job.etaSeconds > 0 ? `${job.etaSeconds}s` : '-'}</small>
+            </div>
+            <div className="mt-1 row text-xs text-slate-500">
+              <small>Hôte {jobHost(job)}</small>
+              <small>Retry {retryLabel(job)}</small>
+              <small>Prochaine tentative {nextRetryLabel(job)}</small>
             </div>
             {job.errorMessage ? (
               <p className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-700">

@@ -44,12 +44,46 @@ func TestEngineRetryThenSuccess(t *testing.T) {
 		t.Fatalf("create job: %v", err)
 	}
 
-	engine := NewEngine(repo, httpclient.New(5*time.Second), storage.LocalFS{}, events.NewBus(), logger.NewJSONLogger(nil), filepath.Join(t.TempDir(), "downloads"))
+	bus := events.NewBus()
+	engine := NewEngine(repo, httpclient.New(5*time.Second), storage.LocalFS{}, bus, logger.NewJSONLogger(nil), filepath.Join(t.TempDir(), "downloads"))
+	_, sub := bus.Subscribe(16)
 	if err := engine.Start(context.Background(), job.ID); err != nil {
 		t.Fatalf("start: %v", err)
 	}
 
 	waitForStatus(t, repo, job.ID, domain.DownloadCompleted)
+	deadline := time.Now().Add(2 * time.Second)
+	foundRetryEvent := false
+	for time.Now().Before(deadline) {
+		select {
+		case evt := <-sub:
+			if evt.Type != "download_retry" {
+				continue
+			}
+			payload, ok := evt.Payload.(map[string]interface{})
+			if !ok {
+				t.Fatalf("unexpected payload type %T", evt.Payload)
+			}
+			if payload["nextRetryInMs"] == nil {
+				t.Fatalf("expected nextRetryInMs in retry payload")
+			}
+			if payload["retry"] == nil || payload["retryMax"] == nil {
+				t.Fatalf("expected retry counters in retry payload")
+			}
+			foundRetryEvent = true
+		default:
+			if foundRetryEvent {
+				break
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+		if foundRetryEvent {
+			break
+		}
+	}
+	if !foundRetryEvent {
+		t.Fatalf("expected at least one download_retry event")
+	}
 	updated, err := repo.GetDownload(context.Background(), job.ID)
 	if err != nil {
 		t.Fatalf("get job: %v", err)
