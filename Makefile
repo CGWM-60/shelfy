@@ -44,6 +44,25 @@ dev:
 			npm install --prefix frontend; \
 		fi; \
 		load_dotenv; \
+		api_addr="$${HTTP_ADDR:-:8080}"; \
+		api_host="127.0.0.1"; \
+		if [[ "$$api_addr" == \[*\]:* ]]; then \
+			api_host="$${api_addr%%]*}"; \
+			api_host="$${api_host#[}"; \
+			api_port="$${api_addr##*:}"; \
+		elif [[ "$$api_addr" == *:* && "$$api_addr" != :* ]]; then \
+			api_host="$${api_addr%:*}"; \
+			api_port="$${api_addr##*:}"; \
+		elif [[ "$$api_addr" == :* ]]; then \
+			api_port="$${api_addr##*:}"; \
+		else \
+			api_port="8080"; \
+		fi; \
+		if [ -z "$$api_host" ] || [ "$$api_host" = "0.0.0.0" ] || [ "$$api_host" = "::" ] || [ "$$api_host" = "[::]" ]; then \
+			api_host="127.0.0.1"; \
+		fi; \
+		export VITE_PROXY_TARGET="http://$${api_host}:$${api_port}"; \
+		echo "Proxy frontend API: $$VITE_PROXY_TARGET"; \
 		go run ./cmd/api & api_pid=$$!; \
 		go run ./cmd/worker & worker_pid=$$!; \
 		npm run dev --prefix frontend -- --host $(FRONTEND_HOST) --port $(FRONTEND_PORT) & front_pid=$$!; \

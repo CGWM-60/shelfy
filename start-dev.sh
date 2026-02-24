@@ -201,6 +201,8 @@ if [ -z "$api_host" ] || [ "$api_host" = "0.0.0.0" ] || [ "$api_host" = "::" ] |
   api_host="127.0.0.1"
 fi
 health_url="http://${api_host}:${api_port}/api/health"
+export VITE_PROXY_TARGET="http://${api_host}:${api_port}"
+echo "Proxy frontend API: ${VITE_PROXY_TARGET}"
 front_port="${FRONTEND_PORT}"
 api_retries=$((API_READY_TIMEOUT_SECONDS * 2))
 
