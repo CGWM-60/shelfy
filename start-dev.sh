@@ -9,6 +9,7 @@ FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 API_LOG="${API_LOG:-/tmp/shelfy-api.log}"
 WORKER_LOG="${WORKER_LOG:-/tmp/shelfy-worker.log}"
 FRONT_LOG="${FRONT_LOG:-/tmp/shelfy-front.log}"
+API_READY_TIMEOUT_SECONDS="${API_READY_TIMEOUT_SECONDS:-180}"
 
 load_dotenv() {
   [ -f .env ] || return 0
@@ -69,7 +70,7 @@ is_running() {
 
 wait_for_api() {
   local health_url="$1"
-  local retries="${2:-60}"
+  local retries="$2"
   local sleep_s="${3:-0.5}"
   local i
   for ((i = 1; i <= retries; i++)); do
@@ -88,6 +89,15 @@ wait_for_api() {
   echo "API non prête sur $health_url après attente."
   tail -n 80 "$API_LOG" || true
   return 1
+}
+
+kill_tree() {
+  local pid="$1"
+  kill "$pid" 2>/dev/null || true
+  pkill -TERM -P "$pid" 2>/dev/null || true
+  sleep 1
+  kill -9 "$pid" 2>/dev/null || true
+  pkill -KILL -P "$pid" 2>/dev/null || true
 }
 
 load_dotenv
@@ -109,20 +119,29 @@ api_port="${HTTP_ADDR:-:8080}"
 api_port="${api_port##*:}"
 health_url="http://127.0.0.1:${api_port}/api/health"
 front_port="${FRONTEND_PORT}"
+api_retries=$((API_READY_TIMEOUT_SECONDS * 2))
 
 check_port_free "$api_port" "api" || exit 1
 check_port_free "$front_port" "frontend" || exit 1
 
+mkdir -p /tmp
+: >"$API_LOG"
+: >"$WORKER_LOG"
+: >"$FRONT_LOG"
+
 echo "Logs API: $API_LOG"
 echo "Logs Worker: $WORKER_LOG"
 echo "Logs Front: $FRONT_LOG"
+
+echo "Préchargement des dépendances Go..."
+go mod download >>"$API_LOG" 2>&1
 
 echo "Démarrage API..."
 go run ./cmd/api >>"$API_LOG" 2>&1 &
 api_pid=$!
 
 echo "Attente API sur $health_url ..."
-wait_for_api "$health_url"
+wait_for_api "$health_url" "$api_retries"
 
 echo "Démarrage Worker..."
 go run ./cmd/worker >>"$WORKER_LOG" 2>&1 &
@@ -138,7 +157,9 @@ cleanup() {
   cleanup_done=1
   echo ""
   echo "Arrêt des services..."
-  kill "$api_pid" "$worker_pid" "$front_pid" 2>/dev/null || true
+  kill_tree "$front_pid"
+  kill_tree "$worker_pid"
+  kill_tree "$api_pid"
   wait "$api_pid" "$worker_pid" "$front_pid" 2>/dev/null || true
 }
 
