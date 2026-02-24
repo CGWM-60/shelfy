@@ -48,6 +48,39 @@ require_cmd() {
   fi
 }
 
+ensure_sqlite_writable() {
+  local raw_dsn="$1"
+  if [ -z "$raw_dsn" ]; then
+    raw_dsn="shelfy.db"
+  fi
+  if [[ "$raw_dsn" == file:* ]]; then
+    raw_dsn="${raw_dsn#file:}"
+    raw_dsn="${raw_dsn%%\?*}"
+  fi
+  if [[ "$raw_dsn" == *"mode=ro"* ]]; then
+    echo "DB_DSN est en mode lecture seule (mode=ro), impossible d'écrire."
+    exit 1
+  fi
+  local db_path="$raw_dsn"
+  if [[ "$db_path" != /* ]]; then
+    db_path="$ROOT_DIR/$db_path"
+  fi
+  local db_dir
+  db_dir="$(dirname "$db_path")"
+  mkdir -p "$db_dir"
+  touch "$db_path" 2>/dev/null || true
+  if [ ! -w "$db_dir" ] || [ ! -w "$db_path" ]; then
+    echo "SQLite non inscriptible: $db_path"
+    echo "Utilisateur courant: $(id -un)"
+    echo "Corrige avec:"
+    echo "  sudo chown -R $(id -un):$(id -gn) \"$ROOT_DIR\""
+    echo "  sudo chmod -R u+rwX \"$ROOT_DIR\""
+    exit 1
+  fi
+  export DB_DSN="$db_path"
+  echo "DB SQLite: $DB_DSN"
+}
+
 check_port_free() {
   local port="$1"
   local label="$2"
@@ -134,6 +167,7 @@ fi
 db_driver="${DB_DRIVER:-sqlite}"
 if [ "$db_driver" = "sqlite" ]; then
   require_cmd gcc
+  ensure_sqlite_writable "${DB_DSN:-shelfy.db}"
 fi
 
 api_port="${HTTP_ADDR:-:8080}"
