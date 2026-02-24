@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import '@xterm/xterm/css/xterm.css'
+import '../styles/xterm.css'
 
 function buildTerminalWSURL() {
   const apiBase = (import.meta.env.VITE_API_BASE ?? '').trim()
