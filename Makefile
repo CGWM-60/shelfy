@@ -26,9 +26,12 @@ dev:
 				export "$$key=$$val"; \
 			done < .env; \
 		}; \
-		if [ ! -d frontend/node_modules ]; then \
-			echo "frontend/node_modules absent: installation des dépendances..."; \
-			$(MAKE) deps; \
+		need_front_install=0; \
+		if [ ! -d frontend/node_modules ]; then need_front_install=1; fi; \
+		if [ ! -d frontend/node_modules/@xterm/xterm ] || [ ! -d frontend/node_modules/@xterm/addon-fit ]; then need_front_install=1; fi; \
+		if [ "$$need_front_install" -eq 1 ]; then \
+			echo "Dépendances frontend manquantes: installation..."; \
+			npm install --prefix frontend; \
 		fi; \
 		load_dotenv; \
 		go run ./cmd/api & api_pid=$$!; \

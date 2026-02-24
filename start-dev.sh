@@ -159,7 +159,14 @@ load_dotenv
 require_cmd go
 require_cmd npm
 
+need_frontend_install=0
 if [ ! -d frontend/node_modules ]; then
+  need_frontend_install=1
+fi
+if [ ! -d frontend/node_modules/@xterm/xterm ] || [ ! -d frontend/node_modules/@xterm/addon-fit ]; then
+  need_frontend_install=1
+fi
+if [ "$need_frontend_install" -eq 1 ]; then
   echo "Installation des dépendances frontend..."
   npm install --prefix frontend
 fi
