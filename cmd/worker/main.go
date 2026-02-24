@@ -47,6 +47,7 @@ func main() {
 		Strs("media_paths", cfg.MediaPaths).
 		Int("download_max_concurrent", cfg.DownloadMaxConcurrent).
 		Bool("download_auto_resume", cfg.DownloadAutoResume).
+		Bool("download_auto_group", cfg.DownloadAutoGroup).
 		Bool("ai_enabled", cfg.AIEnabled).
 		Bool("dlna_enabled", cfg.DLNAEnabled).
 		Bool("smb_enabled", cfg.SMBEnabled).

@@ -42,7 +42,7 @@ var episodeRegex = regexp.MustCompile(`(?i)s(\d{1,2})e(\d{1,2})`)
 
 func (s *Scanner) Scan(ctx context.Context, root string) (int, error) {
 	count := 0
-	root = filepath.Clean(root)
+	root = canonicalMediaPath(root)
 	seen := make(map[string]struct{})
 
 	err := s.walker.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -52,11 +52,12 @@ func (s *Scanner) Scan(ctx context.Context, root string) (int, error) {
 		if d.IsDir() {
 			return nil
 		}
-		item, ok := parseMedia(path)
+		canonicalPath := canonicalMediaPath(path)
+		item, ok := parseMedia(canonicalPath)
 		if !ok {
 			return nil
 		}
-		item.ID = uuid.NewSHA1(uuid.NameSpaceURL, []byte(filepath.Clean(path))).String()
+		item.ID = uuid.NewSHA1(uuid.NameSpaceURL, []byte(canonicalPath)).String()
 		now := time.Now()
 		item.CreatedAt = now
 		item.UpdatedAt = now
@@ -156,4 +157,20 @@ func isWithinRoot(filePath, root string) bool {
 	}
 	prefix := root + string(filepath.Separator)
 	return strings.HasPrefix(filePath, prefix)
+}
+
+func canonicalMediaPath(raw string) string {
+	cleaned := filepath.Clean(strings.TrimSpace(raw))
+	if cleaned == "." || cleaned == "" {
+		return cleaned
+	}
+	abs, err := filepath.Abs(cleaned)
+	if err != nil {
+		return cleaned
+	}
+	resolved, err := filepath.EvalSymlinks(abs)
+	if err == nil && strings.TrimSpace(resolved) != "" {
+		return filepath.Clean(resolved)
+	}
+	return filepath.Clean(abs)
 }

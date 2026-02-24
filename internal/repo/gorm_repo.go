@@ -53,7 +53,7 @@ func (r *GormRepository) GetDownload(ctx context.Context, id string) (domain.Dow
 
 func (r *GormRepository) ListDownloads(ctx context.Context) ([]domain.DownloadJob, error) {
 	var models []DownloadJobModel
-	if err := r.db.WithContext(ctx).Order("created_at desc").Find(&models).Error; err != nil {
+	if err := r.db.WithContext(ctx).Order("created_at asc").Find(&models).Error; err != nil {
 		return nil, err
 	}
 	out := make([]domain.DownloadJob, 0, len(models))

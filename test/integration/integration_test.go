@@ -237,6 +237,34 @@ func TestMediaScanFixtureIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestMediaScanAutoIndexesAI(t *testing.T) {
+	env := setupEnv(t)
+	mediaRoot := t.TempDir()
+	mediaFile := filepath.Join(mediaRoot, "my-movie.mp4")
+	if err := os.WriteFile(mediaFile, []byte("fake"), 0o644); err != nil {
+		t.Fatalf("write media file: %v", err)
+	}
+
+	scanRes := postJSON(t, env.router, "/api/media/scan", map[string]string{"path": mediaRoot})
+	if scanRes.Code != http.StatusOK {
+		t.Fatalf("scan status=%d body=%s", scanRes.Code, scanRes.Body.String())
+	}
+
+	searchRes := postJSON(t, env.router, "/api/ai/search", map[string]interface{}{"query": "my movie", "limit": 5})
+	if searchRes.Code != http.StatusOK {
+		t.Fatalf("ai search status=%d body=%s", searchRes.Code, searchRes.Body.String())
+	}
+	var payload struct {
+		Data []domain.AISearchResult `json:"data"`
+	}
+	if err := json.Unmarshal(searchRes.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode ai search: %v body=%s", err, searchRes.Body.String())
+	}
+	if len(payload.Data) == 0 {
+		t.Fatalf("expected automatic ai indexing to return search results")
+	}
+}
+
 func TestStreamRangeHeadersAndBody(t *testing.T) {
 	env := setupEnv(t)
 	mediaFile := filepath.Join(t.TempDir(), "sample.mp4")

@@ -52,3 +52,32 @@ func TestScanPrunesDeletedFiles(t *testing.T) {
 		t.Fatalf("expected media rows pruned, got %d", len(items))
 	}
 }
+
+func TestScanDedupesSameFileViaSymlinkedRoot(t *testing.T) {
+	r := testutil.NewSQLiteRepo(t)
+	root := t.TempDir()
+	filePath := filepath.Join(root, "movie.mp4")
+	if err := os.WriteFile(filePath, []byte("movie"), 0o644); err != nil {
+		t.Fatalf("write media file: %v", err)
+	}
+	linkRoot := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(root, linkRoot); err != nil {
+		t.Skipf("symlink not supported on this platform: %v", err)
+	}
+
+	scanner := NewScanner(r, OSWalker{}, events.NewBus())
+	if _, err := scanner.Scan(context.Background(), root); err != nil {
+		t.Fatalf("scan root: %v", err)
+	}
+	if _, err := scanner.Scan(context.Background(), linkRoot); err != nil {
+		t.Fatalf("scan symlink root: %v", err)
+	}
+
+	items, err := r.ListMedia(context.Background(), "", "")
+	if err != nil {
+		t.Fatalf("list media: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected deduped media rows=1 got=%d", len(items))
+	}
+}

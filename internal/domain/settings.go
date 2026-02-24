@@ -3,6 +3,7 @@ package domain
 type AppSettings struct {
 	DownloadMaxConcurrent int      `json:"downloadMaxConcurrent"`
 	DownloadAutoResume    bool     `json:"downloadAutoResume"`
+	DownloadAutoGroup     bool     `json:"downloadAutoGroup"`
 	DownloadsPath         string   `json:"downloadsPath"`
 	LibraryPaths          []string `json:"libraryPaths"`
 	GlobalRateLimitKB     int      `json:"globalRateLimitKB"`

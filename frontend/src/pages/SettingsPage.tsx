@@ -6,6 +6,7 @@ import { applyTheme } from '../theme'
 const initialState: AppSettings = {
   downloadMaxConcurrent: 3,
   downloadAutoResume: true,
+  downloadAutoGroup: true,
   downloadsPath: '',
   libraryPaths: [],
   globalRateLimitKB: 0,
@@ -350,6 +351,10 @@ export function SettingsPage() {
         <label className="inline-flex items-center gap-2 text-sm text-slate-700">
           <input className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-300" type="checkbox" checked={settings.downloadAutoResume} onChange={(e) => setSettings({ ...settings, downloadAutoResume: e.target.checked })} />
           Auto-resume au redémarrage
+        </label>
+        <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+          <input className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-300" type="checkbox" checked={settings.downloadAutoGroup} onChange={(e) => setSettings({ ...settings, downloadAutoGroup: e.target.checked })} />
+          Regrouper automatiquement séries / mangas
         </label>
         <label className="inline-flex items-center gap-2 text-sm text-slate-700">
           <input className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-300" type="checkbox" checked={settings.aiEnabled} onChange={(e) => setSettings({ ...settings, aiEnabled: e.target.checked })} />

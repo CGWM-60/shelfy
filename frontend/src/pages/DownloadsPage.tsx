@@ -31,6 +31,35 @@ function readPayloadNumber(payload: Record<string, unknown>, key: string): numbe
   return value
 }
 
+function displayNameFromRawPath(raw: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed) return ''
+  const normalized = trimmed.replace(/\\/g, '/')
+  const parts = normalized.split('/').filter(Boolean)
+  return parts.length > 0 ? parts[parts.length - 1] : normalized
+}
+
+function duplicateToastLabel(payload: Record<string, unknown>): string {
+  const destination = readPayloadString(payload, 'destination')
+  if (destination) {
+    const name = displayNameFromRawPath(destination)
+    if (name) return name
+  }
+  for (const key of ['direct', 'source']) {
+    const value = readPayloadString(payload, key)
+    if (!value) continue
+    try {
+      const parsed = new URL(value)
+      const name = displayNameFromRawPath(decodeURIComponent(parsed.pathname))
+      if (name) return name
+    } catch {
+      const name = displayNameFromRawPath(value)
+      if (name) return name
+    }
+  }
+  return 'élément'
+}
+
 function jobHost(job: DownloadJob): string {
   const candidate = job.directLink || job.sourceLink
   try {
@@ -183,6 +212,11 @@ export function DownloadsPage() {
       )))
     }
 
+    const onDuplicateSkipped = (event: MessageEvent) => {
+      const payload = parseSSEData(event)
+      setToast(`Doublon ignoré: ${duplicateToastLabel(payload)}`)
+    }
+
     source.addEventListener('download_progress', onProgress as EventListener)
     source.addEventListener('download_retry', onRetry as EventListener)
     source.addEventListener('download_queued', applyStatus('queued') as EventListener)
@@ -191,6 +225,7 @@ export function DownloadsPage() {
     source.addEventListener('download_completed', applyStatus('completed') as EventListener)
     source.addEventListener('download_failed', applyStatus('failed') as EventListener)
     source.addEventListener('download_canceled', applyStatus('canceled') as EventListener)
+    source.addEventListener('download_duplicate_skipped', onDuplicateSkipped as EventListener)
 
     return () => {
       source.close()

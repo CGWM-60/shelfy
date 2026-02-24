@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -141,5 +142,74 @@ func TestAIIndexDedupesSameDocumentAcrossMediaAndDownloads(t *testing.T) {
 	}
 	if len(results) != 1 {
 		t.Fatalf("expected deduped result count=1 got=%d results=%+v", len(results), results)
+	}
+}
+
+func TestAIIndexDedupesIdenticalContentAcrossDifferentMediaIDs(t *testing.T) {
+	r := testutil.NewSQLiteRepo(t)
+	now := time.Now()
+	_ = r.UpsertMediaItem(context.Background(), domain.MediaItem{
+		ID:        "m1",
+		Title:     "Film identique",
+		Kind:      domain.MediaVideo,
+		Path:      "/tmp/a/movie-a.mkv",
+		CreatedAt: now,
+		UpdatedAt: now,
+	})
+	_ = r.UpsertMediaItem(context.Background(), domain.MediaItem{
+		ID:        "m2",
+		Title:     "Film identique",
+		Kind:      domain.MediaVideo,
+		Path:      "/tmp/b/movie-b.mkv",
+		CreatedAt: now,
+		UpdatedAt: now,
+	})
+
+	svc := NewService(r, FakeEmbeddingProvider{}, FakeLLMProvider{})
+	count, err := svc.Index(context.Background())
+	if err != nil {
+		t.Fatalf("index error: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected deduped indexed count=1 got=%d", count)
+	}
+}
+
+func TestAIIndexIsSerializedWhenCalledConcurrently(t *testing.T) {
+	r := testutil.NewSQLiteRepo(t)
+	now := time.Now()
+	_ = r.UpsertMediaItem(context.Background(), domain.MediaItem{
+		ID:        "m1",
+		Title:     "Film concurrent",
+		Kind:      domain.MediaVideo,
+		Path:      "/tmp/movie.mkv",
+		CreatedAt: now,
+		UpdatedAt: now,
+	})
+	svc := NewService(r, FakeEmbeddingProvider{}, FakeLLMProvider{})
+
+	var wg sync.WaitGroup
+	errs := make(chan error, 2)
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := svc.Index(context.Background())
+			errs <- err
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("concurrent index error: %v", err)
+		}
+	}
+	chunks, err := r.ListAIChunks(context.Background())
+	if err != nil {
+		t.Fatalf("list chunks: %v", err)
+	}
+	if len(chunks) != 1 {
+		t.Fatalf("expected single chunk after concurrent indexing, got=%d", len(chunks))
 	}
 }

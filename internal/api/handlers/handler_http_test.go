@@ -161,6 +161,62 @@ func TestPostDownloadsCreated(t *testing.T) {
 	}
 }
 
+func TestPostDownloadsDedupesAndAutoIndexesAI(t *testing.T) {
+	router := newRouter(t, t.TempDir())
+	payload := map[string]interface{}{
+		"links": []string{
+			"https://example.test/file.bin",
+			"https://example.test/file.bin",
+		},
+	}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/api/downloads", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusCreated {
+		t.Fatalf("status=%d body=%s", res.Code, res.Body.String())
+	}
+	var created struct {
+		Data []domain.DownloadJob `json:"data"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decode created jobs: %v body=%s", err, res.Body.String())
+	}
+	if len(created.Data) != 1 {
+		t.Fatalf("expected deduped created jobs=1 got=%d body=%s", len(created.Data), res.Body.String())
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/downloads", nil)
+	listRes := httptest.NewRecorder()
+	router.ServeHTTP(listRes, listReq)
+	var listed struct {
+		Data []domain.DownloadJob `json:"data"`
+	}
+	if err := json.Unmarshal(listRes.Body.Bytes(), &listed); err != nil {
+		t.Fatalf("decode listed jobs: %v body=%s", err, listRes.Body.String())
+	}
+	if len(listed.Data) != 1 {
+		t.Fatalf("expected persisted jobs=1 got=%d", len(listed.Data))
+	}
+
+	reportReq := httptest.NewRequest(http.MethodGet, "/api/ai/report", nil)
+	reportRes := httptest.NewRecorder()
+	router.ServeHTTP(reportRes, reportReq)
+	if reportRes.Code != http.StatusOK {
+		t.Fatalf("report status=%d body=%s", reportRes.Code, reportRes.Body.String())
+	}
+	var report struct {
+		Data ai.Report `json:"data"`
+	}
+	if err := json.Unmarshal(reportRes.Body.Bytes(), &report); err != nil {
+		t.Fatalf("decode report: %v body=%s", err, reportRes.Body.String())
+	}
+	if report.Data.IndexRuns == 0 {
+		t.Fatalf("expected auto ai indexing on downloads add, report=%+v", report.Data)
+	}
+}
+
 func TestPostDownloadsWithDestinationDir(t *testing.T) {
 	router := newRouter(t, t.TempDir())
 	payload := map[string]interface{}{
@@ -177,6 +233,45 @@ func TestPostDownloadsWithDestinationDir(t *testing.T) {
 	}
 	if !strings.Contains(res.Body.String(), "/tmp/custom-downloads") {
 		t.Fatalf("expected destination path in response, body=%s", res.Body.String())
+	}
+}
+
+func TestGetDownloadsKeepsQueueOrderForMultiAdd(t *testing.T) {
+	router := newRouter(t, t.TempDir())
+
+	first := "https://example.test/first.bin"
+	second := "https://example.test/second.bin"
+	payload := map[string]interface{}{
+		"links": []string{first, second},
+	}
+	body, _ := json.Marshal(payload)
+
+	createReq := httptest.NewRequest(http.MethodPost, "/api/downloads", bytes.NewReader(body))
+	createReq.Header.Set("Content-Type", "application/json")
+	createRes := httptest.NewRecorder()
+	router.ServeHTTP(createRes, createReq)
+	if createRes.Code != http.StatusCreated {
+		t.Fatalf("create status=%d body=%s", createRes.Code, createRes.Body.String())
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/downloads", nil)
+	listRes := httptest.NewRecorder()
+	router.ServeHTTP(listRes, listReq)
+	if listRes.Code != http.StatusOK {
+		t.Fatalf("list status=%d body=%s", listRes.Code, listRes.Body.String())
+	}
+
+	var decoded struct {
+		Data []domain.DownloadJob `json:"data"`
+	}
+	if err := json.Unmarshal(listRes.Body.Bytes(), &decoded); err != nil {
+		t.Fatalf("decode list: %v body=%s", err, listRes.Body.String())
+	}
+	if len(decoded.Data) < 2 {
+		t.Fatalf("expected at least 2 downloads, got=%d body=%s", len(decoded.Data), listRes.Body.String())
+	}
+	if decoded.Data[0].SourceLink != first || decoded.Data[1].SourceLink != second {
+		t.Fatalf("unexpected queue order: got=[%s, %s] want=[%s, %s]", decoded.Data[0].SourceLink, decoded.Data[1].SourceLink, first, second)
 	}
 }
 
@@ -347,6 +442,40 @@ func TestAIReport(t *testing.T) {
 	}
 	if body.Data.UptimeSec < 0 {
 		t.Fatalf("invalid uptime: %d", body.Data.UptimeSec)
+	}
+}
+
+func TestMediaScanAutoIndexesAI(t *testing.T) {
+	mediaDir := t.TempDir()
+	filePath := filepath.Join(mediaDir, "movie.mp4")
+	if err := os.WriteFile(filePath, []byte("movie"), 0o644); err != nil {
+		t.Fatalf("write media file: %v", err)
+	}
+	router := newRouter(t, mediaDir)
+
+	scanBody, _ := json.Marshal(map[string]string{"path": mediaDir})
+	scanReq := httptest.NewRequest(http.MethodPost, "/api/media/scan", bytes.NewReader(scanBody))
+	scanReq.Header.Set("Content-Type", "application/json")
+	scanRes := httptest.NewRecorder()
+	router.ServeHTTP(scanRes, scanReq)
+	if scanRes.Code != http.StatusOK {
+		t.Fatalf("scan status=%d body=%s", scanRes.Code, scanRes.Body.String())
+	}
+
+	reportReq := httptest.NewRequest(http.MethodGet, "/api/ai/report", nil)
+	reportRes := httptest.NewRecorder()
+	router.ServeHTTP(reportRes, reportReq)
+	if reportRes.Code != http.StatusOK {
+		t.Fatalf("report status=%d body=%s", reportRes.Code, reportRes.Body.String())
+	}
+	var report struct {
+		Data ai.Report `json:"data"`
+	}
+	if err := json.Unmarshal(reportRes.Body.Bytes(), &report); err != nil {
+		t.Fatalf("decode report: %v body=%s", err, reportRes.Body.String())
+	}
+	if report.Data.IndexRuns == 0 || report.Data.LastIndexedCount == 0 {
+		t.Fatalf("expected auto ai indexing on media scan, report=%+v", report.Data)
 	}
 }
 

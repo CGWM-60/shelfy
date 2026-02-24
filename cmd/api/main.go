@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"cgwm/shelfy/internal/ai"
 	"cgwm/shelfy/internal/api"
@@ -87,6 +88,7 @@ func main() {
 	defaultSettings := domain.AppSettings{
 		DownloadMaxConcurrent: cfg.DownloadMaxConcurrent,
 		DownloadAutoResume:    cfg.DownloadAutoResume,
+		DownloadAutoGroup:     cfg.DownloadAutoGroup,
 		DownloadsPath:         cfg.StoragePath,
 		LibraryPaths:          cfg.MediaPaths,
 		AIEnabled:             cfg.AIEnabled,
@@ -108,6 +110,7 @@ func main() {
 		if strings.TrimSpace(job.DestinationPath) == "" {
 			return nil
 		}
+		autoIndexReason := "download_completed"
 		settings, err := settingsSvc.Get(ctx)
 		if err != nil {
 			return err
@@ -126,14 +129,44 @@ func main() {
 			}
 			if destAbs == rootAbs || strings.HasPrefix(destAbs, rootAbs+string(filepath.Separator)) {
 				_, scanErr := mediaSvc.Scan(ctx, root)
-				return scanErr
+				if scanErr != nil {
+					return scanErr
+				}
+				if settings.AIEnabled {
+					go func() {
+						indexCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+						defer cancel()
+						count, indexErr := aiSvc.Index(indexCtx)
+						if indexErr != nil {
+							log.Warn().Err(indexErr).Str("reason", autoIndexReason).Msg("auto ai index failed")
+							bus.Publish(events.Event{
+								Type: "ai_index_failed",
+								At:   time.Now(),
+								Payload: map[string]interface{}{
+									"reason": autoIndexReason,
+									"error":  indexErr.Error(),
+								},
+							})
+							return
+						}
+						bus.Publish(events.Event{
+							Type: "ai_indexed",
+							At:   time.Now(),
+							Payload: map[string]interface{}{
+								"reason": autoIndexReason,
+								"count":  count,
+							},
+						})
+					}()
+				}
+				return nil
 			}
 		}
 		return nil
 	})
 
 	appSvc := &service.App{
-		Downloads: service.NewDownloadService(r, engine, debridSvc, bus),
+		Downloads: service.NewDownloadService(r, engine, debridSvc, bus, cfg.DownloadAutoGroup),
 		Debrid:    debridSvc,
 		Media:     mediaSvc,
 		AI:        aiSvc,
@@ -320,6 +353,7 @@ func logAPIBootSummary(log zerolog.Logger, cfg config.Config, dlnaBaseURL string
 		Strs("media_paths", cfg.MediaPaths).
 		Int("download_max_concurrent", cfg.DownloadMaxConcurrent).
 		Bool("download_auto_resume", cfg.DownloadAutoResume).
+		Bool("download_auto_group", cfg.DownloadAutoGroup).
 		Bool("ai_enabled", cfg.AIEnabled).
 		Bool("auth_enabled", cfg.AuthEnabled).
 		Bool("dlna_enabled", cfg.DLNAEnabled).

@@ -69,6 +69,7 @@ func mergeSettings(base, override domain.AppSettings) domain.AppSettings {
 	}
 
 	out.DownloadAutoResume = override.DownloadAutoResume
+	out.DownloadAutoGroup = override.DownloadAutoGroup
 	out.AIEnabled = override.AIEnabled
 	out.FileServerAuthEnabled = override.FileServerAuthEnabled
 	out.DLNAEnabled = override.DLNAEnabled

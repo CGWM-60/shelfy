@@ -21,6 +21,7 @@ type Config struct {
 
 	DownloadMaxConcurrent int
 	DownloadAutoResume    bool
+	DownloadAutoGroup     bool
 
 	MistralAPIKey     string
 	MistralEmbedModel string
@@ -62,6 +63,7 @@ type fileConfig struct {
 
 	DownloadMaxConcurrent int  `json:"downloadMaxConcurrent"`
 	DownloadAutoResume    bool `json:"downloadAutoResume"`
+	DownloadAutoGroup     bool `json:"downloadAutoGroup"`
 
 	MistralAPIKey     string `json:"mistralApiKey"`
 	MistralEmbedModel string `json:"mistralEmbedModel"`
@@ -112,6 +114,7 @@ func defaults() Config {
 		RequestTimeout:        30 * time.Second,
 		DownloadMaxConcurrent: 3,
 		DownloadAutoResume:    true,
+		DownloadAutoGroup:     true,
 		MistralEmbedModel:     "mistral-embed",
 		MistralChatModel:      "mistral-small-latest",
 		AIEnabled:             true,
@@ -167,6 +170,7 @@ func applyFile(cfg *Config) {
 		cfg.DownloadMaxConcurrent = raw.DownloadMaxConcurrent
 	}
 	cfg.DownloadAutoResume = raw.DownloadAutoResume
+	cfg.DownloadAutoGroup = raw.DownloadAutoGroup
 
 	if raw.MistralAPIKey != "" {
 		cfg.MistralAPIKey = raw.MistralAPIKey
@@ -276,6 +280,9 @@ func applyEnv(cfg *Config) {
 	}
 	if parsed, ok := parseBool(os.Getenv("DOWNLOAD_AUTO_RESUME")); ok {
 		cfg.DownloadAutoResume = parsed
+	}
+	if parsed, ok := parseBool(os.Getenv("DOWNLOAD_AUTO_GROUP")); ok {
+		cfg.DownloadAutoGroup = parsed
 	}
 
 	if v := os.Getenv("MISTRAL_API_KEY"); v != "" {

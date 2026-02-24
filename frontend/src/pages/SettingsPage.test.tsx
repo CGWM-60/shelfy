@@ -51,7 +51,7 @@ test('gestionnaire fichiers: crée, édite, déplace et supprime', async () => {
     items: [{ name: 'film.mp4', path: '/tmp/media/film.mp4', isDir: false, sizeBytes: 100, modifiedAt: new Date().toISOString() }]
   })
   client.readFSFile = vi.fn().mockResolvedValue({ path: '/tmp/media/film.mp4', content: 'abc' })
-  client.getSettings = vi.fn().mockResolvedValue({ downloadMaxConcurrent: 3, downloadAutoResume: true, downloadsPath: '/tmp/downloads', libraryPaths: ['/tmp/media'], globalRateLimitKB: 0, aiEnabled: true, aiTopK: 5, theme: 'clair', visibleColumns: ['nom'], fileServerAuthEnabled: false, fileServerAuthUser: '', dlnaEnabled: true, smbEnabled: true, smbShareName: 'shelfy', smbSharePath: '/tmp/media' })
+  client.getSettings = vi.fn().mockResolvedValue({ downloadMaxConcurrent: 3, downloadAutoResume: true, downloadAutoGroup: true, downloadsPath: '/tmp/downloads', libraryPaths: ['/tmp/media'], globalRateLimitKB: 0, aiEnabled: true, aiTopK: 5, theme: 'clair', visibleColumns: ['nom'], fileServerAuthEnabled: false, fileServerAuthUser: '', dlnaEnabled: true, smbEnabled: true, smbShareName: 'shelfy', smbSharePath: '/tmp/media' })
   client.getDLNADevices = vi.fn().mockResolvedValue({
     enabled: true,
     devices: [{ usn: 'uuid:tv-1', st: 'upnp:rootdevice', server: 'DLNA/1.5', location: 'http://tv.local/device.xml', address: '192.168.1.20:1900', lastSeenAt: new Date().toISOString() }],
@@ -124,6 +124,7 @@ test('tolère un statut SMB avec clients null sans écran blanc', async () => {
   client.getSettings = vi.fn().mockResolvedValue({
     downloadMaxConcurrent: 3,
     downloadAutoResume: true,
+    downloadAutoGroup: true,
     downloadsPath: '/tmp/downloads',
     libraryPaths: ['/tmp/media'],
     globalRateLimitKB: 0,

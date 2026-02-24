@@ -42,6 +42,7 @@ type ResolvedItem struct {
 	SourceLink string `json:"sourceLink"`
 	DirectLink string `json:"directLink"`
 	FileName   string `json:"fileName"`
+	GroupName  string `json:"groupName,omitempty"`
 	Provider   string `json:"provider"`
 }
 
@@ -233,8 +234,15 @@ func (s *Service) ResolveLink(ctx context.Context, link string, opts ResolveOpti
 	}
 	if result.Type == "folder" && result.Folder != nil {
 		out := make([]ResolvedItem, 0, len(result.Folder.Files))
+		groupName := result.Folder.Name
 		for _, f := range result.Folder.Files {
-			out = append(out, ResolvedItem{SourceLink: link, DirectLink: f.URL, FileName: f.Name, Provider: account.Provider})
+			out = append(out, ResolvedItem{
+				SourceLink: link,
+				DirectLink: f.URL,
+				FileName:   f.Name,
+				GroupName:  groupName,
+				Provider:   account.Provider,
+			})
 		}
 		return out, nil
 	}

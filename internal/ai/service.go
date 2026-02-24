@@ -21,6 +21,7 @@ type Service struct {
 	embeddings  EmbeddingProvider
 	llm         LLMProvider
 	defaultTopK int
+	indexMu     sync.Mutex
 	mu          sync.Mutex
 	metrics     metrics
 }
@@ -147,6 +148,9 @@ func (s *Service) SetDefaultTopK(k int) {
 }
 
 func (s *Service) Index(ctx context.Context) (int, error) {
+	s.indexMu.Lock()
+	defer s.indexMu.Unlock()
+
 	started := time.Now()
 	media, err := s.repo.ListMedia(ctx, "", "")
 	if err != nil {
@@ -179,6 +183,7 @@ func (s *Service) Index(ctx context.Context) (int, error) {
 	}
 	docs := make([]document, 0, len(media)+len(downloads))
 	seen := map[string]struct{}{}
+	seenContent := map[string]struct{}{}
 	addDoc := func(mediaID, key, content string) {
 		key = strings.TrimSpace(strings.ToLower(key))
 		content = strings.TrimSpace(content)
@@ -191,7 +196,12 @@ func (s *Service) Index(ctx context.Context) (int, error) {
 		if _, exists := seen[key]; exists {
 			return
 		}
+		contentKey := normalizeDocumentContent(content)
+		if _, exists := seenContent[contentKey]; exists {
+			return
+		}
 		seen[key] = struct{}{}
+		seenContent[contentKey] = struct{}{}
 		docs = append(docs, document{
 			mediaID: mediaID,
 			key:     key,
@@ -455,4 +465,9 @@ func resolveTitle(id string, mediaTitle map[string]string) string {
 		return strings.TrimPrefix(id, "download:")
 	}
 	return id
+}
+
+func normalizeDocumentContent(content string) string {
+	lowered := strings.ToLower(strings.TrimSpace(content))
+	return strings.Join(strings.Fields(lowered), " ")
 }

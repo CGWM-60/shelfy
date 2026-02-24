@@ -123,6 +123,7 @@ func (h *Handler) PostDownloads(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	h.maybeAutoIndexAI(r.Context(), "downloads_added")
 	writeJSON(w, http.StatusCreated, jobs)
 }
 
@@ -356,6 +357,7 @@ func (h *Handler) PostMediaScan(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	h.maybeAutoIndexAI(r.Context(), "media_scanned")
 	writeJSON(w, http.StatusOK, map[string]int{"count": count})
 }
 
@@ -916,6 +918,7 @@ func (h *Handler) rescanLibraries(ctx context.Context) {
 	if err != nil {
 		return
 	}
+	scannedAny := false
 	for _, root := range settings.LibraryPaths {
 		if strings.TrimSpace(root) == "" {
 			continue
@@ -923,8 +926,42 @@ func (h *Handler) rescanLibraries(ctx context.Context) {
 		if _, err := h.fs.Stat(root); err != nil {
 			continue
 		}
-		_, _ = h.svc.Media.Scan(ctx, root)
+		if _, err := h.svc.Media.Scan(ctx, root); err == nil {
+			scannedAny = true
+		}
 	}
+	if scannedAny {
+		h.maybeAutoIndexAI(ctx, "library_rescan")
+	}
+}
+
+func (h *Handler) maybeAutoIndexAI(ctx context.Context, reason string) {
+	settings, err := h.svc.Settings.Get(ctx)
+	if err != nil || !settings.AIEnabled {
+		return
+	}
+	indexCtx, cancel := timeoutContext(ctx, 30*time.Second)
+	defer cancel()
+	count, err := h.svc.AI.Index(indexCtx)
+	if err != nil {
+		h.events.Publish(events.Event{
+			Type: "ai_index_failed",
+			At:   time.Now(),
+			Payload: map[string]interface{}{
+				"reason": reason,
+				"error":  err.Error(),
+			},
+		})
+		return
+	}
+	h.events.Publish(events.Event{
+		Type: "ai_indexed",
+		At:   time.Now(),
+		Payload: map[string]interface{}{
+			"reason": reason,
+			"count":  count,
+		},
+	})
 }
 
 func (h *Handler) PutSettings(w http.ResponseWriter, r *http.Request) {

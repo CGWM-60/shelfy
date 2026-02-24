@@ -20,14 +20,15 @@ async function installMockAPI(page: Page, options?: { authEnabled?: boolean }) {
   const downloads: Download[] = []
   const debridAccounts: Array<{ id: number; provider: string; label: string; isActive: boolean; isDefault: boolean; authType: string }> = []
   const media = [
-    { id: 'm1', title: 'Film A', kind: 'video', path: '/tmp/a.mp4' },
-    { id: 'm2', title: 'Image A', kind: 'image', path: '/tmp/a.jpg' },
-    { id: 'm3', title: 'PDF A', kind: 'pdf', path: '/tmp/a.pdf' }
+    { id: 'm1', title: 'Film A', kind: 'video', path: '/tmp/media/a.mp4' },
+    { id: 'm2', title: 'Image A', kind: 'image', path: '/tmp/media/a.jpg' },
+    { id: 'm3', title: 'PDF A', kind: 'pdf', path: '/tmp/media/a.pdf' }
   ]
   const progress = new Map<string, number>()
   const settings = {
     downloadMaxConcurrent: 3,
     downloadAutoResume: true,
+    downloadAutoGroup: true,
     downloadsPath: '/tmp/downloads',
     libraryPaths: ['/tmp/media'],
     globalRateLimitKB: 0,
@@ -52,12 +53,17 @@ async function installMockAPI(page: Page, options?: { authEnabled?: boolean }) {
       lastSeenAt: new Date().toISOString()
     }
   ]
-  const fsRoots = ['/tmp/downloads', '/tmp/media']
+  const fsRoots = ['/tmp/media', '/tmp/downloads']
   const fsItemsByPath = new Map<string, Array<{ name: string; path: string; isDir: boolean; sizeBytes: number; modifiedAt: string }>>()
   const fsFiles = new Map<string, string>()
   const nowISO = () => new Date().toISOString()
   fsItemsByPath.set('/tmp/downloads', [])
-  fsItemsByPath.set('/tmp/media', [{ name: 'notes.txt', path: '/tmp/media/notes.txt', isDir: false, sizeBytes: 7, modifiedAt: nowISO() }])
+  fsItemsByPath.set('/tmp/media', [
+    { name: 'notes.txt', path: '/tmp/media/notes.txt', isDir: false, sizeBytes: 7, modifiedAt: nowISO() },
+    { name: 'a.mp4', path: '/tmp/media/a.mp4', isDir: false, sizeBytes: 7, modifiedAt: nowISO() },
+    { name: 'a.jpg', path: '/tmp/media/a.jpg', isDir: false, sizeBytes: 7, modifiedAt: nowISO() },
+    { name: 'a.pdf', path: '/tmp/media/a.pdf', isDir: false, sizeBytes: 7, modifiedAt: nowISO() }
+  ])
   fsFiles.set('/tmp/media/notes.txt', 'bonjour')
 
   const parentPath = (value: string) => {

@@ -91,6 +91,7 @@ export interface AIReport {
 export interface AppSettings {
   downloadMaxConcurrent: number
   downloadAutoResume: boolean
+  downloadAutoGroup: boolean
   downloadsPath: string
   libraryPaths: string[]
   globalRateLimitKB: number

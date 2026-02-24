@@ -198,3 +198,34 @@ test('affiche host + retries + prochaine tentative sur event retry', async () =>
     globalThis.EventSource = originalEventSource
   }
 })
+
+test('affiche un toast quand un doublon est ignoré via SSE', async () => {
+  const originalEventSource = globalThis.EventSource
+  MockEventSource.instances = []
+  globalThis.EventSource = MockEventSource as unknown as typeof EventSource
+  try {
+    const client = createMockClient()
+    client.listDownloads = vi.fn().mockResolvedValue([])
+
+    render(
+      <APIProvider client={client}>
+        <MemoryRouter>
+          <DownloadsPage />
+        </MemoryRouter>
+      </APIProvider>
+    )
+
+    await screen.findByText('Dashboard téléchargements')
+
+    await act(async () => {
+      MockEventSource.instances[0].emit('download_duplicate_skipped', {
+        source: 'https://example.test/folder/file-01.mkv',
+        destination: '/tmp/downloads/Series/file-01.mkv'
+      })
+    })
+
+    await waitFor(() => expect(screen.getByText('Doublon ignoré: file-01.mkv')).toBeInTheDocument())
+  } finally {
+    globalThis.EventSource = originalEventSource
+  }
+})
