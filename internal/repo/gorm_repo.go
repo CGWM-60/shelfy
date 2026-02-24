@@ -206,6 +206,10 @@ func (r *GormRepository) DeleteAIChunksByMedia(ctx context.Context, mediaID stri
 	return r.db.WithContext(ctx).Delete(&AIChunkModel{}, "media_id = ?", mediaID).Error
 }
 
+func (r *GormRepository) DeleteAllAIChunks(ctx context.Context) error {
+	return r.db.WithContext(ctx).Where("1 = 1").Delete(&AIChunkModel{}).Error
+}
+
 func (r *GormRepository) GetAppSettings(ctx context.Context) (domain.AppSettings, error) {
 	var m AppSettingsModel
 	if err := r.db.WithContext(ctx).First(&m, "id = 1").Error; err != nil {

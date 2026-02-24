@@ -152,3 +152,31 @@ export interface FSPathListing {
   path: string
   items: FSManagedEntry[]
 }
+
+export interface StorageRootStat {
+  path: string
+  exists: boolean
+  totalBytes: number
+  freeBytes: number
+  availableBytes: number
+  knownUsedBytes: number
+}
+
+export interface StorageStats {
+  generatedAt: string
+  roots: StorageRootStat[]
+  totals: {
+    totalBytes: number
+    freeBytes: number
+    availableBytes: number
+    knownUsedBytes: number
+  }
+}
+
+export interface StorageSpeedtestResult {
+  path: string
+  sampleMB: number
+  writeMBps: number
+  readMBps: number
+  durationMs: number
+}

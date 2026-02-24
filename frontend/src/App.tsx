@@ -10,6 +10,7 @@ import { MediaDetailPage } from './pages/MediaDetailPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { AIReportPage } from './pages/AIReportPage'
 import { LoginPage } from './pages/LoginPage'
+import { StoragePage } from './pages/StoragePage'
 import { MiniPlayer } from './components/MiniPlayer'
 import { AskAIOverlay } from './components/AskAIOverlay'
 import { applyTheme } from './theme'
@@ -115,11 +116,18 @@ export default function App() {
             {auth.enabled ? (
               <div className="flex items-center gap-2">
                 <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">{auth.username || 'admin'}</span>
+                <button className="btn" onClick={() => void refreshAuth()}>
+                  Vérifier connexion
+                </button>
                 <button className="btn" onClick={() => void logout()}>
                   Déconnexion
                 </button>
               </div>
-            ) : null}
+            ) : (
+              <div className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
+                Connexion désactivée (AUTH_ENABLED=false)
+              </div>
+            )}
           </div>
           <div className="mt-4">
             <Nav />
@@ -129,6 +137,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<DownloadsPage />} />
             <Route path="/library" element={<LibraryPage />} />
+            <Route path="/storage" element={<StoragePage />} />
             <Route path="/media/:id" element={<MediaDetailPage />} />
             <Route path="/debrid" element={<DebridPage />} />
             <Route path="/ai/report" element={<AIReportPage />} />

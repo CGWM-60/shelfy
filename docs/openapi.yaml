@@ -283,6 +283,16 @@ paths:
       summary: Mettre à jour les paramètres applicatifs
       responses:
         '200': { description: OK }
+  /api/system/storage:
+    get:
+      summary: Statistiques de stockage (racines gérées, espace et volume connu indexé)
+      responses:
+        '200': { description: OK }
+  /api/system/speedtest:
+    post:
+      summary: Test de débit disque local (écriture/lecture)
+      responses:
+        '200': { description: OK }
 
   /api/dlna/devices:
     get:

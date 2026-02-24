@@ -1,4 +1,4 @@
-import type { AIAskResponse, AIReport, AIResult, AppSettings, AuthStatus, DebridAccount, DebridProvider, DLNAStatus, DownloadJob, FSPathListing, MediaItem, SMBStatus } from './types'
+import type { AIAskResponse, AIReport, AIResult, AppSettings, AuthStatus, DebridAccount, DebridProvider, DLNAStatus, DownloadJob, FSPathListing, MediaItem, SMBStatus, StorageSpeedtestResult, StorageStats } from './types'
 
 export class AuthError extends Error {
   status: number
@@ -43,6 +43,8 @@ export interface APIClient {
   scanDLNADevices(): Promise<DLNAStatus>
   getSMBStatus(): Promise<SMBStatus>
   refreshSMBStatus(): Promise<SMBStatus>
+  getStorageStats(): Promise<StorageStats>
+  runStorageSpeedtest(sizeMB: number): Promise<StorageSpeedtestResult>
 
   getFSRoots(): Promise<{ roots: string[] }>
   listFS(path?: string): Promise<FSPathListing>
@@ -123,6 +125,8 @@ export const apiClient: APIClient = {
   scanDLNADevices: () => req('/api/dlna/scan', { method: 'POST' }),
   getSMBStatus: () => req('/api/smb/status'),
   refreshSMBStatus: () => req('/api/smb/refresh', { method: 'POST' }),
+  getStorageStats: () => req('/api/system/storage'),
+  runStorageSpeedtest: (sizeMB) => req('/api/system/speedtest', { method: 'POST', body: JSON.stringify({ sizeMB }) }),
 
   getFSRoots: () => req('/api/fs/roots'),
   listFS: (path) => {

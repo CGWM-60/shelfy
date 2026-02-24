@@ -16,6 +16,7 @@ test('affiche la navigation principale', async () => {
 
   await screen.findByTestId('downloads-page')
   expect(screen.getByText('Téléchargements')).toBeInTheDocument()
+  expect(screen.getByText('Stockage')).toBeInTheDocument()
   expect(screen.getByText('Rapport IA')).toBeInTheDocument()
   expect(screen.getByText('Débrideurs')).toBeInTheDocument()
   expect(screen.getByText('Paramètres')).toBeInTheDocument()

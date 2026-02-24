@@ -58,6 +58,8 @@ func NewRouter(h *handlers.Handler, log zerolog.Logger) http.Handler {
 
 			r.Get("/settings", h.GetSettings)
 			r.Put("/settings", h.PutSettings)
+			r.Get("/system/storage", h.GetSystemStorage)
+			r.Post("/system/speedtest", h.PostSystemSpeedtest)
 			r.Get("/dlna/devices", h.GetDLNADevices)
 			r.Post("/dlna/scan", h.PostDLNAScan)
 			r.Get("/dlna/debug", h.GetDLNADebug)

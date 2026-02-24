@@ -35,6 +35,19 @@ export function createMockClient(): APIClient {
     scanDLNADevices: vi.fn().mockResolvedValue({ enabled: false, devices: [], lastScan: '' }),
     getSMBStatus: vi.fn().mockResolvedValue({ enabled: false, running: false, backend: 'fake', shareName: 'shelfy', sharePath: '/tmp/media', updatedAt: new Date().toISOString(), clients: [] }),
     refreshSMBStatus: vi.fn().mockResolvedValue({ enabled: false, running: false, backend: 'fake', shareName: 'shelfy', sharePath: '/tmp/media', updatedAt: new Date().toISOString(), clients: [] }),
+    getStorageStats: vi.fn().mockResolvedValue({
+      generatedAt: new Date().toISOString(),
+      roots: [
+        { path: '/tmp/downloads', exists: true, totalBytes: 1024 * 1024 * 1024, freeBytes: 512 * 1024 * 1024, availableBytes: 500 * 1024 * 1024, knownUsedBytes: 128 * 1024 * 1024 }
+      ],
+      totals: {
+        totalBytes: 1024 * 1024 * 1024,
+        freeBytes: 512 * 1024 * 1024,
+        availableBytes: 500 * 1024 * 1024,
+        knownUsedBytes: 128 * 1024 * 1024
+      }
+    }),
+    runStorageSpeedtest: vi.fn().mockResolvedValue({ path: '/tmp/downloads/.shelfy-speedtest.tmp', sampleMB: 8, writeMBps: 120.5, readMBps: 210.2, durationMs: 260 }),
     getFSRoots: vi.fn().mockResolvedValue({ roots: ['/tmp/downloads', '/tmp/media'] }),
     listFS: vi.fn().mockResolvedValue({ path: '/tmp/media', items: [] }),
     readFSFile: vi.fn().mockResolvedValue({ path: '/tmp/media/note.txt', content: '' }),

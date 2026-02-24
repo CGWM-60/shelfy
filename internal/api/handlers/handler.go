@@ -521,6 +521,145 @@ func (h *Handler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, settings)
 }
 
+func (h *Handler) GetSystemStorage(w http.ResponseWriter, r *http.Request) {
+	roots, err := h.managedRoots(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	knownUsage, err := h.computeKnownUsageByRoot(r.Context(), roots)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	type rootStat struct {
+		Path           string `json:"path"`
+		Exists         bool   `json:"exists"`
+		TotalBytes     uint64 `json:"totalBytes"`
+		FreeBytes      uint64 `json:"freeBytes"`
+		AvailableBytes uint64 `json:"availableBytes"`
+		KnownUsedBytes int64  `json:"knownUsedBytes"`
+	}
+	rootStats := make([]rootStat, 0, len(roots))
+	var totalBytes uint64
+	var freeBytes uint64
+	var availableBytes uint64
+	var knownUsedTotal int64
+	for _, root := range roots {
+		stat := rootStat{
+			Path:           root,
+			KnownUsedBytes: knownUsage[root],
+		}
+		knownUsedTotal += stat.KnownUsedBytes
+		if _, statErr := h.fs.Stat(root); statErr != nil {
+			rootStats = append(rootStats, stat)
+			continue
+		}
+		stat.Exists = true
+		usage, usageErr := h.fs.StatFS(root)
+		if usageErr == nil {
+			stat.TotalBytes = usage.TotalBytes
+			stat.FreeBytes = usage.FreeBytes
+			stat.AvailableBytes = usage.AvailableBytes
+		}
+		rootStats = append(rootStats, stat)
+		totalBytes += stat.TotalBytes
+		freeBytes += stat.FreeBytes
+		availableBytes += stat.AvailableBytes
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"generatedAt": time.Now().UTC().Format(time.RFC3339),
+		"roots":       rootStats,
+		"totals": map[string]interface{}{
+			"totalBytes":     totalBytes,
+			"freeBytes":      freeBytes,
+			"availableBytes": availableBytes,
+			"knownUsedBytes": knownUsedTotal,
+		},
+	})
+}
+
+func (h *Handler) PostSystemSpeedtest(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		SizeMB int `json:"sizeMB"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+		writeError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	sizeMB := req.SizeMB
+	if sizeMB <= 0 {
+		sizeMB = 16
+	}
+	if sizeMB > 128 {
+		sizeMB = 128
+	}
+
+	roots, err := h.managedRoots(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if len(roots) == 0 {
+		writeError(w, http.StatusBadRequest, "no managed roots configured")
+		return
+	}
+	targetRoot := roots[0]
+	if err := h.fs.MkdirAll(targetRoot); err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+
+	tempPath := filepath.Join(targetRoot, ".shelfy-speedtest.tmp")
+	file, err := h.fs.OpenFile(tempPath, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0o644)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	defer func() {
+		_ = file.Close()
+		_ = h.fs.Remove(tempPath)
+	}()
+
+	chunk := make([]byte, 1<<20)
+	var written int64
+	writeStart := time.Now()
+	for i := 0; i < sizeMB; i++ {
+		n, writeErr := file.Write(chunk)
+		if writeErr != nil {
+			writeError(w, http.StatusBadGateway, writeErr.Error())
+			return
+		}
+		written += int64(n)
+	}
+	writeElapsed := time.Since(writeStart)
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+
+	readStart := time.Now()
+	readBytes, err := io.Copy(io.Discard, io.LimitReader(file, written))
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	readElapsed := time.Since(readStart)
+
+	writeMbps := bytesPerSecondToMBps(written, writeElapsed)
+	readMbps := bytesPerSecondToMBps(readBytes, readElapsed)
+	totalElapsed := writeElapsed + readElapsed
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"path":       tempPath,
+		"sampleMB":   sizeMB,
+		"writeMBps":  writeMbps,
+		"readMBps":   readMbps,
+		"durationMs": totalElapsed.Milliseconds(),
+	})
+}
+
 func (h *Handler) GetFSRoots(w http.ResponseWriter, r *http.Request) {
 	roots, err := h.managedRoots(r.Context())
 	if err != nil {
@@ -701,6 +840,75 @@ func (h *Handler) managedRoots(ctx context.Context) ([]string, error) {
 	}
 	sort.Strings(roots)
 	return roots, nil
+}
+
+func (h *Handler) computeKnownUsageByRoot(ctx context.Context, roots []string) (map[string]int64, error) {
+	usage := make(map[string]int64, len(roots))
+	if len(roots) == 0 {
+		return usage, nil
+	}
+	downloads, err := h.svc.Downloads.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	mediaItems, err := h.svc.Media.List(ctx, "", "")
+	if err != nil {
+		return nil, err
+	}
+	for _, root := range roots {
+		usage[root] = 0
+		for _, d := range downloads {
+			if !pathWithinRoot(root, d.DestinationPath) {
+				continue
+			}
+			size := d.SizeBytes
+			if size <= 0 {
+				size = d.DownloadedBytes
+			}
+			usage[root] += maxInt64(size, 0)
+		}
+		for _, item := range mediaItems {
+			if !pathWithinRoot(root, item.Path) {
+				continue
+			}
+			usage[root] += maxInt64(item.SizeBytes, 0)
+		}
+	}
+	return usage, nil
+}
+
+func pathWithinRoot(root, target string) bool {
+	if strings.TrimSpace(root) == "" || strings.TrimSpace(target) == "" {
+		return false
+	}
+	rootAbs, err := filepath.Abs(filepath.Clean(strings.TrimSpace(root)))
+	if err != nil {
+		return false
+	}
+	targetAbs, err := filepath.Abs(filepath.Clean(strings.TrimSpace(target)))
+	if err != nil {
+		return false
+	}
+	if rootAbs == targetAbs {
+		return true
+	}
+	prefix := rootAbs + string(filepath.Separator)
+	return strings.HasPrefix(targetAbs, prefix)
+}
+
+func maxInt64(v, floor int64) int64 {
+	if v < floor {
+		return floor
+	}
+	return v
+}
+
+func bytesPerSecondToMBps(bytes int64, elapsed time.Duration) float64 {
+	if elapsed <= 0 || bytes <= 0 {
+		return 0
+	}
+	mb := float64(bytes) / float64(1024*1024)
+	return mb / elapsed.Seconds()
 }
 
 func (h *Handler) rescanLibraries(ctx context.Context) {

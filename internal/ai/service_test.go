@@ -101,3 +101,45 @@ func TestAIReportTracksUsage(t *testing.T) {
 		t.Fatalf("expected llm token usage > 0")
 	}
 }
+
+func TestAIIndexDedupesSameDocumentAcrossMediaAndDownloads(t *testing.T) {
+	r := testutil.NewSQLiteRepo(t)
+	now := time.Now()
+	const sharedPath = "/tmp/shared/movie.mkv"
+
+	_ = r.UpsertMediaItem(context.Background(), domain.MediaItem{
+		ID:        "m1",
+		Title:     "Film doublon",
+		Kind:      domain.MediaVideo,
+		Path:      sharedPath,
+		Tags:      []string{"action"},
+		CreatedAt: now,
+		UpdatedAt: now,
+	})
+	_ = r.CreateDownload(context.Background(), domain.DownloadJob{
+		ID:              "d1",
+		FileName:        "movie.mkv",
+		SourceLink:      "https://example.test/movie.mkv",
+		DestinationPath: sharedPath,
+		Status:          domain.DownloadCompleted,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	})
+
+	svc := NewService(r, FakeEmbeddingProvider{}, FakeLLMProvider{})
+	count, err := svc.Index(context.Background())
+	if err != nil {
+		t.Fatalf("index error: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected deduped indexed count=1 got=%d", count)
+	}
+
+	results, err := svc.Search(context.Background(), "film action", 10)
+	if err != nil {
+		t.Fatalf("search error: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected deduped result count=1 got=%d results=%+v", len(results), results)
+	}
+}

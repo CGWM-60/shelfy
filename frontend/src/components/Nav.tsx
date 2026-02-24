@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom'
 const links = [
   { to: '/', label: 'Téléchargements' },
   { to: '/library', label: 'Bibliothèque' },
+  { to: '/storage', label: 'Stockage' },
   { to: '/ai/report', label: 'Rapport IA' },
   { to: '/debrid', label: 'Débrideurs' },
   { to: '/settings', label: 'Paramètres' }

@@ -3,7 +3,10 @@ package ai
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"hash/fnv"
 	"math"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -11,7 +14,6 @@ import (
 
 	"cgwm/shelfy/internal/domain"
 	"cgwm/shelfy/internal/repo"
-	"github.com/google/uuid"
 )
 
 type Service struct {
@@ -157,22 +159,62 @@ func (s *Service) Index(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	if len(media) == 0 && len(downloads) == 0 {
+		if err := s.repo.DeleteAllAIChunks(ctx); err != nil {
+			s.recordError(err)
+			return 0, err
+		}
 		s.recordIndex(0, time.Since(started))
 		return 0, nil
 	}
-	ids := make([]string, 0, len(media)+len(downloads))
-	texts := make([]string, 0, len(media)+len(downloads))
+
+	if err := s.repo.DeleteAllAIChunks(ctx); err != nil {
+		s.recordError(err)
+		return 0, err
+	}
+
+	type document struct {
+		mediaID string
+		key     string
+		content string
+	}
+	docs := make([]document, 0, len(media)+len(downloads))
+	seen := map[string]struct{}{}
+	addDoc := func(mediaID, key, content string) {
+		key = strings.TrimSpace(strings.ToLower(key))
+		content = strings.TrimSpace(content)
+		if key == "" {
+			key = mediaID
+		}
+		if content == "" {
+			return
+		}
+		if _, exists := seen[key]; exists {
+			return
+		}
+		seen[key] = struct{}{}
+		docs = append(docs, document{
+			mediaID: mediaID,
+			key:     key,
+			content: content,
+		})
+	}
+
 	for _, m := range media {
-		ids = append(ids, m.ID)
-		texts = append(texts, m.Title+" "+strings.Join(m.Tags, " "))
-		_ = s.repo.DeleteAIChunksByMedia(ctx, m.ID)
+		addDoc(m.ID, mediaKey(m), strings.TrimSpace(m.Title+" "+strings.Join(m.Tags, " ")))
 	}
 	for _, d := range downloads {
 		id := "download:" + d.ID
-		ids = append(ids, id)
-		content := strings.TrimSpace(d.FileName + " " + d.SourceLink)
-		texts = append(texts, content)
-		_ = s.repo.DeleteAIChunksByMedia(ctx, id)
+		content := strings.TrimSpace(d.FileName + " " + d.SourceLink + " " + d.DestinationPath)
+		addDoc(id, downloadKey(d), content)
+	}
+	if len(docs) == 0 {
+		s.recordIndex(0, time.Since(started))
+		return 0, nil
+	}
+
+	texts := make([]string, 0, len(docs))
+	for _, doc := range docs {
+		texts = append(texts, doc.content)
 	}
 	vectors, err := s.embeddings.Embed(ctx, texts)
 	if err != nil {
@@ -180,15 +222,16 @@ func (s *Service) Index(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	s.recordEmbeddingUsage(texts)
-	for i, id := range ids {
+	for i, doc := range docs {
 		raw, _ := json.Marshal(vectors[i])
-		if err := s.repo.UpsertAIChunk(ctx, uuid.NewString(), id, texts[i], string(raw)); err != nil {
+		chunkID := chunkIDForKey(doc.key)
+		if err := s.repo.UpsertAIChunk(ctx, chunkID, doc.mediaID, doc.content, string(raw)); err != nil {
 			s.recordError(err)
 			return 0, err
 		}
 	}
-	s.recordIndex(len(ids), time.Since(started))
-	return len(ids), nil
+	s.recordIndex(len(docs), time.Since(started))
+	return len(docs), nil
 }
 
 func (s *Service) Search(ctx context.Context, query string, limit int) ([]domain.AISearchResult, error) {
@@ -216,19 +259,27 @@ func (s *Service) Search(ctx context.Context, query string, limit int) ([]domain
 	for _, item := range mediaList {
 		mediaTitle[item.ID] = item.Title
 	}
-	results := make([]domain.AISearchResult, 0, len(chunks))
+	best := make(map[string]domain.AISearchResult, len(chunks))
 	for _, chunk := range chunks {
 		var vec []float64
 		if err := json.Unmarshal([]byte(chunk.Embedding), &vec); err != nil {
 			continue
 		}
 		score := cosine(qVecs[0], vec)
-		results = append(results, domain.AISearchResult{
+		result := domain.AISearchResult{
 			MediaID: chunk.MediaID,
 			Snippet: chunk.Content,
 			Score:   score,
 			Title:   resolveTitle(chunk.MediaID, mediaTitle),
-		})
+		}
+		key := strings.ToLower(strings.TrimSpace(chunk.MediaID + "|" + chunk.Content))
+		if existing, ok := best[key]; !ok || result.Score > existing.Score {
+			best[key] = result
+		}
+	}
+	results := make([]domain.AISearchResult, 0, len(best))
+	for _, row := range best {
+		results = append(results, row)
 	}
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].Score > results[j].Score
@@ -337,6 +388,41 @@ func estimateTokenCount(text string) int {
 		return 1
 	}
 	return approx
+}
+
+func chunkIDForKey(key string) string {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(key))
+	return fmt.Sprintf("chunk:%x", h.Sum64())
+}
+
+func normalizePath(raw string) string {
+	cleaned := filepath.Clean(strings.TrimSpace(raw))
+	if cleaned == "." || cleaned == "" {
+		return ""
+	}
+	abs, err := filepath.Abs(cleaned)
+	if err != nil {
+		return strings.ToLower(cleaned)
+	}
+	return strings.ToLower(abs)
+}
+
+func mediaKey(m domain.MediaItem) string {
+	if path := normalizePath(m.Path); path != "" {
+		return "path:" + path
+	}
+	return "media:" + m.ID
+}
+
+func downloadKey(d domain.DownloadJob) string {
+	if path := normalizePath(d.DestinationPath); path != "" {
+		return "path:" + path
+	}
+	if link := strings.TrimSpace(strings.ToLower(d.SourceLink)); link != "" {
+		return "url:" + link
+	}
+	return "download:" + d.ID
 }
 
 func cosine(a, b []float64) float64 {

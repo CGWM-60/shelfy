@@ -32,6 +32,7 @@ type Repository interface {
 	UpsertAIChunk(ctx context.Context, id, mediaID, content, embedding string) error
 	ListAIChunks(ctx context.Context) ([]AIChunkModel, error)
 	DeleteAIChunksByMedia(ctx context.Context, mediaID string) error
+	DeleteAllAIChunks(ctx context.Context) error
 
 	GetAppSettings(ctx context.Context) (domain.AppSettings, error)
 	SaveAppSettings(ctx context.Context, settings domain.AppSettings) error

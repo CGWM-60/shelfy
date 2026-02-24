@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useAPI } from '../api/context'
-import type { AppSettings, DLNAStatus, FSManagedEntry, SMBStatus } from '../api/types'
+import type { AppSettings, AuthStatus, DLNAStatus, FSManagedEntry, SMBStatus } from '../api/types'
 import { applyTheme } from '../theme'
 
 const initialState: AppSettings = {
@@ -81,15 +81,22 @@ export function SettingsPage() {
   const [smbStatus, setSMBStatus] = useState<SMBStatus>({ enabled: false, running: false, backend: 'none', shareName: 'shelfy', sharePath: '', updatedAt: '', clients: [] })
   const [smbLoading, setSMBLoading] = useState(false)
   const [smbError, setSMBError] = useState('')
+  const [authStatus, setAuthStatus] = useState<AuthStatus>({ enabled: false, authenticated: true, username: '' })
+  const [authLoading, setAuthLoading] = useState(false)
 
   useEffect(() => {
-    Promise.all([api.getSettings(), api.getFSRoots(), api.getDLNADevices(), api.getSMBStatus()])
-      .then(([loadedSettings, loadedRoots, loadedDLNA, loadedSMB]) => {
+    Promise.all([api.getSettings(), api.getFSRoots(), api.getDLNADevices(), api.getSMBStatus(), api.authStatus()])
+      .then(([loadedSettings, loadedRoots, loadedDLNA, loadedSMB, loadedAuth]) => {
         setSettings(normalizeSettings(loadedSettings))
         const safeRoots = asArray(loadedRoots?.roots)
         setRoots(safeRoots)
         setDLNAStatus(normalizeDLNAStatus(loadedDLNA))
         setSMBStatus(normalizeSMBStatus(loadedSMB))
+        setAuthStatus({
+          enabled: Boolean(loadedAuth?.enabled),
+          authenticated: Boolean(loadedAuth?.authenticated),
+          username: loadedAuth?.username || ''
+        })
         const firstRoot = safeRoots[0] ?? ''
         if (firstRoot) {
           void refreshFS(firstRoot)
@@ -99,6 +106,34 @@ export function SettingsPage() {
         setError(err instanceof Error ? err.message : 'Impossible de charger les paramètres')
       })
   }, [api])
+
+  async function refreshAuthStatus() {
+    setAuthLoading(true)
+    try {
+      const next = await api.authStatus()
+      setAuthStatus({
+        enabled: Boolean(next.enabled),
+        authenticated: Boolean(next.authenticated),
+        username: next.username || ''
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Impossible de charger l'état connexion")
+    } finally {
+      setAuthLoading(false)
+    }
+  }
+
+  async function logoutSession() {
+    setAuthLoading(true)
+    try {
+      await api.authLogout()
+      await refreshAuthStatus()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible de se déconnecter')
+    } finally {
+      setAuthLoading(false)
+    }
+  }
 
   useEffect(() => {
     applyTheme(settings.theme || 'clair')
@@ -262,6 +297,38 @@ export function SettingsPage() {
       </div>
       {saved ? <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{saved}</p> : null}
       {error ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p> : null}
+
+      <article className="stack rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="row">
+          <div>
+            <h2 className="m-0 text-lg font-semibold text-slate-900">Connexion application</h2>
+            <p className="m-0 mt-1 text-sm text-slate-600">Contrôle rapide de la session de connexion et état de la protection API.</p>
+          </div>
+          <div className="flex gap-2">
+            <button type="button" className="btn" onClick={() => void refreshAuthStatus()} disabled={authLoading}>
+              {authLoading ? 'Vérification...' : 'Vérifier'}
+            </button>
+            {authStatus.enabled && authStatus.authenticated ? (
+              <button type="button" className="btn" onClick={() => void logoutSession()} disabled={authLoading}>
+                Déconnexion
+              </button>
+            ) : null}
+          </div>
+        </div>
+        <p className="m-0 text-sm text-slate-700">
+          Protection: <strong>{authStatus.enabled ? 'active' : 'désactivée'}</strong> • Session: <strong>{authStatus.authenticated ? 'ouverte' : 'fermée'}</strong>
+          {authStatus.username ? (
+            <>
+              {' '}• Utilisateur: <strong>{authStatus.username}</strong>
+            </>
+          ) : null}
+        </p>
+        {!authStatus.enabled ? (
+          <p className="m-0 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            Active `AUTH_ENABLED=true` + `AUTH_USER` + `AUTH_PASS` + `AUTH_SESSION_SECRET` dans `.env`, puis redémarre pour afficher la page login au démarrage.
+          </p>
+        ) : null}
+      </article>
 
       <form onSubmit={submit} className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 md:grid-cols-2">
         <label className="stack text-sm text-slate-700">

@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"syscall"
 )
 
 type File interface {
@@ -20,6 +21,13 @@ type FileSystem interface {
 	OpenFile(name string, flag int, perm os.FileMode) (File, error)
 	Stat(name string) (fs.FileInfo, error)
 	Remove(name string) error
+	StatFS(path string) (FSUsage, error)
+}
+
+type FSUsage struct {
+	TotalBytes     uint64
+	FreeBytes      uint64
+	AvailableBytes uint64
 }
 
 type LocalFS struct{}
@@ -41,4 +49,16 @@ func (LocalFS) Stat(name string) (fs.FileInfo, error) {
 
 func (LocalFS) Remove(name string) error {
 	return os.Remove(name)
+}
+
+func (LocalFS) StatFS(path string) (FSUsage, error) {
+	var st syscall.Statfs_t
+	if err := syscall.Statfs(path, &st); err != nil {
+		return FSUsage{}, err
+	}
+	return FSUsage{
+		TotalBytes:     st.Blocks * uint64(st.Bsize),
+		FreeBytes:      st.Bfree * uint64(st.Bsize),
+		AvailableBytes: st.Bavail * uint64(st.Bsize),
+	}, nil
 }

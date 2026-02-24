@@ -368,6 +368,86 @@ func TestSettingsEndpoints(t *testing.T) {
 	}
 }
 
+func TestSystemStorageEndpoint(t *testing.T) {
+	mediaDir := t.TempDir()
+	router := newRouter(t, mediaDir)
+
+	downloadBody, _ := json.Marshal(map[string]interface{}{
+		"links":          []string{"https://example.test/file.bin"},
+		"destinationDir": mediaDir,
+	})
+	downloadReq := httptest.NewRequest(http.MethodPost, "/api/downloads", bytes.NewReader(downloadBody))
+	downloadRes := httptest.NewRecorder()
+	router.ServeHTTP(downloadRes, downloadReq)
+	if downloadRes.Code != http.StatusCreated {
+		t.Fatalf("create download status=%d body=%s", downloadRes.Code, downloadRes.Body.String())
+	}
+
+	storageReq := httptest.NewRequest(http.MethodGet, "/api/system/storage", nil)
+	storageRes := httptest.NewRecorder()
+	router.ServeHTTP(storageRes, storageReq)
+	if storageRes.Code != http.StatusOK {
+		t.Fatalf("storage status=%d body=%s", storageRes.Code, storageRes.Body.String())
+	}
+
+	var payload struct {
+		Data struct {
+			Roots []struct {
+				Path           string `json:"path"`
+				Exists         bool   `json:"exists"`
+				KnownUsedBytes int64  `json:"knownUsedBytes"`
+			} `json:"roots"`
+			Totals struct {
+				KnownUsedBytes int64 `json:"knownUsedBytes"`
+			} `json:"totals"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(storageRes.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode storage payload: %v body=%s", err, storageRes.Body.String())
+	}
+	if len(payload.Data.Roots) == 0 {
+		t.Fatalf("expected at least one storage root")
+	}
+	if payload.Data.Totals.KnownUsedBytes < 0 {
+		t.Fatalf("invalid known used bytes total=%d", payload.Data.Totals.KnownUsedBytes)
+	}
+}
+
+func TestSystemSpeedtestEndpoint(t *testing.T) {
+	mediaDir := t.TempDir()
+	router := newRouter(t, mediaDir)
+
+	reqBody, _ := json.Marshal(map[string]int{"sizeMB": 1})
+	speedReq := httptest.NewRequest(http.MethodPost, "/api/system/speedtest", bytes.NewReader(reqBody))
+	speedRes := httptest.NewRecorder()
+	router.ServeHTTP(speedRes, speedReq)
+	if speedRes.Code != http.StatusOK {
+		t.Fatalf("speedtest status=%d body=%s", speedRes.Code, speedRes.Body.String())
+	}
+
+	var payload struct {
+		Data struct {
+			Path       string  `json:"path"`
+			SampleMB   int     `json:"sampleMB"`
+			WriteMBps  float64 `json:"writeMBps"`
+			ReadMBps   float64 `json:"readMBps"`
+			DurationMs int64   `json:"durationMs"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(speedRes.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode speedtest payload: %v body=%s", err, speedRes.Body.String())
+	}
+	if payload.Data.SampleMB != 1 {
+		t.Fatalf("expected sampleMB=1 got=%d", payload.Data.SampleMB)
+	}
+	if payload.Data.Path == "" {
+		t.Fatalf("expected speedtest path in response")
+	}
+	if payload.Data.WriteMBps < 0 || payload.Data.ReadMBps < 0 {
+		t.Fatalf("invalid throughput write=%.4f read=%.4f", payload.Data.WriteMBps, payload.Data.ReadMBps)
+	}
+}
+
 func TestDLNASettingsAndScanEndpoints(t *testing.T) {
 	router := newRouter(t, t.TempDir())
 
