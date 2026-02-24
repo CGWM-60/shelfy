@@ -83,6 +83,13 @@ paths:
       summary: SSE des événements (download/debrid/media)
       responses:
         '200': { description: text/event-stream }
+  /api/terminal/ws:
+    get:
+      summary: WebSocket terminal interactif
+      description: Endpoint WebSocket (upgrade requis) pour une session shell serveur.
+      responses:
+        '101': { description: Switching Protocols }
+        '400': { description: Upgrade WebSocket requis }
 
   /api/debrid/providers:
     get:

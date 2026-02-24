@@ -4,6 +4,7 @@ const links = [
   { to: '/', label: 'Téléchargements' },
   { to: '/library', label: 'Bibliothèque' },
   { to: '/storage', label: 'Stockage' },
+  { to: '/terminal', label: 'Terminal' },
   { to: '/ai/report', label: 'Rapport IA' },
   { to: '/debrid', label: 'Débrideurs' },
   { to: '/settings', label: 'Paramètres' }

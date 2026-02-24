@@ -11,6 +11,7 @@ import { SettingsPage } from './pages/SettingsPage'
 import { AIReportPage } from './pages/AIReportPage'
 import { LoginPage } from './pages/LoginPage'
 import { StoragePage } from './pages/StoragePage'
+import { TerminalPage } from './pages/TerminalPage'
 import { MiniPlayer } from './components/MiniPlayer'
 import { AskAIOverlay } from './components/AskAIOverlay'
 import { applyTheme } from './theme'
@@ -138,6 +139,7 @@ export default function App() {
             <Route path="/" element={<DownloadsPage />} />
             <Route path="/library" element={<LibraryPage />} />
             <Route path="/storage" element={<StoragePage />} />
+            <Route path="/terminal" element={<TerminalPage />} />
             <Route path="/media/:id" element={<MediaDetailPage />} />
             <Route path="/debrid" element={<DebridPage />} />
             <Route path="/ai/report" element={<AIReportPage />} />

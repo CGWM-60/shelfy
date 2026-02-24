@@ -32,6 +32,7 @@ func NewRouter(h *handlers.Handler, log zerolog.Logger) http.Handler {
 			r.Post("/downloads/{id}/resume", h.PostDownloadResume)
 			r.Delete("/downloads/{id}", h.DeleteDownload)
 			r.Get("/events", h.GetEvents)
+			r.Get("/terminal/ws", h.GetTerminalWS)
 
 			r.Get("/debrid/providers", h.GetDebridProviders)
 			r.Post("/debrid/accounts", h.PostDebridAccount)

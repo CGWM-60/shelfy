@@ -356,6 +356,19 @@ func TestAIStatus(t *testing.T) {
 	}
 }
 
+func TestTerminalWSEndpointRequiresUpgrade(t *testing.T) {
+	router := newRouter(t, t.TempDir())
+	req := httptest.NewRequest(http.MethodGet, "/api/terminal/ws", nil)
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", res.Code, res.Body.String())
+	}
+	if !strings.Contains(res.Body.String(), "websocket upgrade required") {
+		t.Fatalf("unexpected body=%s", res.Body.String())
+	}
+}
+
 func TestAPIAuthLoginFlow(t *testing.T) {
 	router := newRouterWithAPIAuth(t, t.TempDir())
 

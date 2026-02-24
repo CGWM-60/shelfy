@@ -29,7 +29,9 @@ import (
 	"cgwm/shelfy/internal/service"
 	"cgwm/shelfy/internal/smb"
 	"cgwm/shelfy/internal/stream"
+	"cgwm/shelfy/internal/terminal"
 	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/websocket"
 )
 
 type Handler struct {
@@ -40,13 +42,29 @@ type Handler struct {
 	fileUser string
 	filePass string
 	auth     *auth.Manager
+	terminal terminal.Runner
+}
+
+var terminalUpgrader = websocket.Upgrader{
+	CheckOrigin: func(_ *http.Request) bool {
+		return true
+	},
 }
 
 func New(app *service.App, bus *events.Bus, mediaDir string, fs storage.FileSystem, fileUser, filePass string, authManager *auth.Manager) *Handler {
 	if authManager == nil {
 		authManager, _ = auth.NewManager(auth.Config{Enabled: false})
 	}
-	return &Handler{svc: app, events: bus, mediaDir: mediaDir, fs: fs, fileUser: fileUser, filePass: filePass, auth: authManager}
+	return &Handler{
+		svc:      app,
+		events:   bus,
+		mediaDir: mediaDir,
+		fs:       fs,
+		fileUser: fileUser,
+		filePass: filePass,
+		auth:     authManager,
+		terminal: terminal.NewLocalRunner(""),
+	}
 }
 
 func (h *Handler) AuthManager() *auth.Manager {
@@ -196,6 +214,76 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+	}
+}
+
+func (h *Handler) GetTerminalWS(w http.ResponseWriter, r *http.Request) {
+	conn, err := terminalUpgrader.Upgrade(w, r, nil)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "websocket upgrade required")
+		return
+	}
+	defer conn.Close()
+
+	if h.terminal == nil {
+		_ = conn.WriteMessage(websocket.TextMessage, []byte("terminal unavailable"))
+		return
+	}
+	session, err := h.terminal.Open(r.Context())
+	if err != nil {
+		_ = conn.WriteMessage(websocket.TextMessage, []byte("cannot open terminal session"))
+		return
+	}
+	defer session.Close()
+
+	done := make(chan struct{}, 2)
+	signalDone := func() {
+		select {
+		case done <- struct{}{}:
+		default:
+		}
+	}
+
+	go func() {
+		buffer := make([]byte, 4096)
+		for {
+			n, readErr := session.Read(buffer)
+			if n > 0 {
+				if writeErr := conn.WriteMessage(websocket.BinaryMessage, buffer[:n]); writeErr != nil {
+					signalDone()
+					return
+				}
+			}
+			if readErr != nil {
+				signalDone()
+				return
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			messageType, payload, readErr := conn.ReadMessage()
+			if readErr != nil {
+				signalDone()
+				return
+			}
+			if messageType != websocket.TextMessage && messageType != websocket.BinaryMessage {
+				continue
+			}
+			if len(payload) == 0 {
+				continue
+			}
+			if _, writeErr := session.Write(payload); writeErr != nil {
+				signalDone()
+				return
+			}
+		}
+	}()
+
+	select {
+	case <-r.Context().Done():
+	case <-done:
 	}
 }
 
