@@ -46,6 +46,23 @@ require_cmd() {
   fi
 }
 
+check_port_free() {
+  local port="$1"
+  local label="$2"
+  local in_use=""
+  if command -v ss >/dev/null 2>&1; then
+    in_use="$(ss -ltnp 2>/dev/null | awk -v p=":${port}" '$4 ~ p"$" {print $0}' || true)"
+  elif command -v lsof >/dev/null 2>&1; then
+    in_use="$(lsof -nP -iTCP:"${port}" -sTCP:LISTEN 2>/dev/null || true)"
+  fi
+  if [ -n "$in_use" ]; then
+    echo "Port ${port} déjà utilisé (${label})."
+    echo "$in_use"
+    return 1
+  fi
+  return 0
+}
+
 is_running() {
   kill -0 "$1" 2>/dev/null
 }
@@ -83,9 +100,18 @@ if [ ! -d frontend/node_modules ]; then
   npm install --prefix frontend
 fi
 
+db_driver="${DB_DRIVER:-sqlite}"
+if [ "$db_driver" = "sqlite" ]; then
+  require_cmd gcc
+fi
+
 api_port="${HTTP_ADDR:-:8080}"
 api_port="${api_port##*:}"
 health_url="http://127.0.0.1:${api_port}/api/health"
+front_port="${FRONTEND_PORT}"
+
+check_port_free "$api_port" "api" || exit 1
+check_port_free "$front_port" "frontend" || exit 1
 
 echo "Logs API: $API_LOG"
 echo "Logs Worker: $WORKER_LOG"
