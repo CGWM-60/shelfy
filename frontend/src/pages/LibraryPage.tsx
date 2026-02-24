@@ -1,5 +1,5 @@
 import { DragEvent, MouseEvent, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAPI } from '../api/context'
 import type { FSManagedEntry, MediaItem } from '../api/types'
 
@@ -8,6 +8,13 @@ function basename(path: string) {
   const idx = normalized.lastIndexOf('/')
   if (idx < 0) return normalized
   return normalized.slice(idx + 1)
+}
+
+function normalizeFsPath(path: string) {
+  if (!path) return ''
+  const slashNormalized = path.replace(/\\/g, '/').replace(/\/+/g, '/')
+  if (slashNormalized.length <= 1) return slashNormalized
+  return slashNormalized.replace(/\/+$/, '')
 }
 
 function parentPath(path: string) {
@@ -125,6 +132,15 @@ export function LibraryPage() {
   const [toast, setToast] = useState('')
   const [error, setError] = useState('')
 
+  function findMediaByPath(index: Record<string, MediaItem>, path: string) {
+    const direct = index[path]
+    if (direct) return direct
+    const normalizedPath = normalizeFsPath(path)
+    const normalized = index[normalizedPath]
+    if (normalized) return normalized
+    return Object.values(index).find((item) => normalizeFsPath(item.path) === normalizedPath)
+  }
+
   async function refreshMediaIndex() {
     setError('')
     try {
@@ -132,10 +148,16 @@ export function LibraryPage() {
       const next: Record<string, MediaItem> = {}
       for (const item of media) {
         next[item.path] = item
+        const normalized = normalizeFsPath(item.path)
+        if (normalized) {
+          next[normalized] = item
+        }
       }
       setMediaByPath(next)
+      return next
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Impossible de charger la bibliothèque')
+      return {} as Record<string, MediaItem>
     }
   }
 
@@ -408,14 +430,23 @@ export function LibraryPage() {
     }
   }
 
-  function openEntry(entry: FSManagedEntry, mediaItem?: MediaItem) {
+  async function openEntry(entry: FSManagedEntry, mediaItem?: MediaItem) {
     if (entry.isDir) {
-      void refreshPath(entry.path)
+      await refreshPath(entry.path)
       return
     }
-    if (mediaItem) {
-      navigate(`/media/${mediaItem.id}`)
+    const resolved = mediaItem || findMediaByPath(mediaByPath, entry.path)
+    if (resolved) {
+      navigate(`/media/${resolved.id}`)
+      return
     }
+    const refreshed = await refreshMediaIndex()
+    const resolvedAfterRefresh = findMediaByPath(refreshed, entry.path)
+    if (resolvedAfterRefresh) {
+      navigate(`/media/${resolvedAfterRefresh.id}`)
+      return
+    }
+    setError('Média non indexé. Lance un scan bibliothèque.')
   }
 
   const filteredEntries = useMemo(() => {
@@ -623,12 +654,7 @@ export function LibraryPage() {
                       <p className="m-0 truncate text-xs text-slate-500">{entry.path}</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {entry.isDir ? (
-                        <button className="btn" onClick={() => void refreshPath(entry.path)}>Ouvrir</button>
-                      ) : null}
-                      {!entry.isDir && mediaItem ? (
-                        <Link className="btn" to={`/media/${mediaItem.id}`} aria-label={mediaItem.title}>{mediaItem.title}</Link>
-                      ) : null}
+                      <button className="btn" onClick={() => void openEntry(entry, mediaItem)}>Ouvrir</button>
                       {canMoveUp ? (
                         <button className="btn" onClick={() => void moveEntryToParent(entry)}>Déplacer au parent</button>
                       ) : null}
@@ -666,7 +692,7 @@ export function LibraryPage() {
             onClick={() => {
               const entry = contextMenu.entry
               const mediaItem = mediaByPath[entry.path]
-              openEntry(entry, mediaItem)
+              void openEntry(entry, mediaItem)
               setContextMenu(null)
             }}
           >

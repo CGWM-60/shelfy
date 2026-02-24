@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { APIProvider } from '../api/context'
 import { createMockClient } from '../test/mockClient'
 import { LibraryPage } from './LibraryPage'
@@ -264,4 +264,36 @@ test('remonter le dossier courant d’un cran', async () => {
   fireEvent.click(screen.getByText(/Remonter ce dossier d/))
 
   await waitFor(() => expect(client.moveFSPath).toHaveBeenCalledWith('/tmp/media/Series/Season1', '/tmp/media/Season1'))
+})
+
+test('ouvre un fichier même si le chemin indexé diffère (normalisation + refresh)', async () => {
+  const client = createMockClient()
+  client.getFSRoots = vi.fn().mockResolvedValue({ roots: ['/tmp/media'] })
+  client.listFS = vi.fn().mockResolvedValue({
+    path: '/tmp/media',
+    items: [
+      { name: 'Film A.mp4', path: '/tmp/media/Film A.mp4', isDir: false, sizeBytes: 1000, modifiedAt: new Date().toISOString() }
+    ]
+  })
+  client.listMedia = vi
+    .fn()
+    .mockResolvedValueOnce([])
+    .mockResolvedValueOnce([{ id: 'm1', title: 'Film A', kind: 'video', path: '/tmp/media//Film A.mp4' }])
+
+  render(
+    <APIProvider client={client}>
+      <MemoryRouter initialEntries={['/library']}>
+        <Routes>
+          <Route path="/library" element={<LibraryPage />} />
+          <Route path="/media/:id" element={<div data-testid="media-route">Media Detail</div>} />
+        </Routes>
+      </MemoryRouter>
+    </APIProvider>
+  )
+
+  const row = await screen.findByTestId('library-entry-Film A.mp4')
+  fireEvent.click(within(row).getByRole('button', { name: 'Ouvrir' }))
+
+  expect(await screen.findByTestId('media-route')).toBeInTheDocument()
+  expect(client.listMedia).toHaveBeenCalledTimes(2)
 })
