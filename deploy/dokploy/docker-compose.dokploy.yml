@@ -42,6 +42,10 @@ services:
       - shelfy_data:/data
       - shelfy_media:/media:ro
     restart: unless-stopped
+    networks:
+      default:
+        aliases:
+          - "${COMPOSE_PROJECT_NAME}-api"
 
   worker:
     build:
@@ -98,6 +102,8 @@ services:
     restart: unless-stopped
     depends_on:
       - api
+    environment:
+      API_UPSTREAM: "${COMPOSE_PROJECT_NAME}-api:8080"
 
 volumes:
   shelfy_data:
