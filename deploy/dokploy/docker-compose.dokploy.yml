@@ -1,6 +1,5 @@
 services:
   api:
-    container_name: shelfy-api
     build:
       context: ../..
       dockerfile: deploy/qnap/Dockerfile.api
@@ -45,7 +44,6 @@ services:
     restart: unless-stopped
 
   worker:
-    container_name: shelfy-worker
     build:
       context: ../..
       dockerfile: deploy/qnap/Dockerfile.worker
@@ -92,12 +90,11 @@ services:
       - api
 
   web:
-    container_name: shelfy-web
     build:
       context: ../..
       dockerfile: deploy/dokploy/Dockerfile.web
-    ports:
-      - "3000:80"
+    expose:
+      - "80"
     restart: unless-stopped
     depends_on:
       - api
