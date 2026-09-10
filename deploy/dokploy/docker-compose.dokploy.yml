@@ -46,6 +46,9 @@ services:
       default:
         aliases:
           - "${COMPOSE_PROJECT_NAME}-api"
+      dokploy-network:
+        aliases:
+          - "${COMPOSE_PROJECT_NAME}-api"
 
   worker:
     build:
@@ -108,3 +111,7 @@ services:
 volumes:
   shelfy_data:
   shelfy_media:
+
+networks:
+  dokploy-network:
+    external: true
