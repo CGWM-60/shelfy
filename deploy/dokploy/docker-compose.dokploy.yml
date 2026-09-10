@@ -4,40 +4,40 @@ services:
       context: ../..
       dockerfile: deploy/qnap/Dockerfile.api
     environment:
-      APP_ENV: prod
-      HTTP_ADDR: :8080
-      CONFIG_FILE: ""
-      HTTP_TIMEOUT_SECONDS: "30"
-      DB_DRIVER: sqlite
-      DB_DSN: /data/shelfy.db
-      STORAGE_PATH: /data/downloads
-      MEDIA_PATHS: /data/downloads,/media
-      DOWNLOAD_MAX_CONCURRENT: "3"
-      DOWNLOAD_AUTO_RESUME: "true"
-      AI_ENABLED: "true"
-      AI_TOP_K: "5"
-      MISTRAL_API_KEY: ""
-      MISTRAL_EMBED_MODEL: mistral-embed
-      MISTRAL_CHAT_MODEL: mistral-small-latest
-      DEBRIDLINK_API_BASE: https://debrid-link.com
-      DEBRIDLINK_OAUTH_CLIENT_ID: ""
-      DEBRIDLINK_OAUTH_CLIENT_SECRET: ""
-      DEBRIDLINK_OAUTH_SCOPE: get.account get.post.delete.downloader get.files get.post.stream
-      FILESERVER_ENABLED: "true"
-      FILESERVER_AUTH_USER: ""
-      FILESERVER_AUTH_PASS: ""
-      DLNA_ENABLED: "false"
-      DLNA_BASE_URL: ""
-      SMB_ENABLED: "false"
-      SMB_SHARE_NAME: shelfy
-      SMB_SHARE_PATH: /data/downloads
-      SMB_BINARY: smbd
-      SMB_STATUS_BINARY: smbstatus
-      AUTH_ENABLED: "true"
-      AUTH_USER: admin
-      AUTH_PASS: change-me
-      AUTH_SESSION_SECRET: change-me-long-random-secret
-      AUTH_SESSION_TTL_HOURS: "24"
+      APP_ENV: "${APP_ENV:-prod}"
+      HTTP_ADDR: "${HTTP_ADDR:-:8080}"
+      CONFIG_FILE: "${CONFIG_FILE:-}"
+      HTTP_TIMEOUT_SECONDS: "${HTTP_TIMEOUT_SECONDS:-30}"
+      DB_DRIVER: "${DB_DRIVER:-sqlite}"
+      DB_DSN: "${DB_DSN:-/data/shelfy.db}"
+      STORAGE_PATH: "${STORAGE_PATH:-/data/downloads}"
+      MEDIA_PATHS: "${MEDIA_PATHS:-/data/downloads,/media}"
+      DOWNLOAD_MAX_CONCURRENT: "${DOWNLOAD_MAX_CONCURRENT:-3}"
+      DOWNLOAD_AUTO_RESUME: "${DOWNLOAD_AUTO_RESUME:-true}"
+      AI_ENABLED: "${AI_ENABLED:-false}"
+      AI_TOP_K: "${AI_TOP_K:-5}"
+      MISTRAL_API_KEY: "${MISTRAL_API_KEY:-}"
+      MISTRAL_EMBED_MODEL: "${MISTRAL_EMBED_MODEL:-mistral-embed}"
+      MISTRAL_CHAT_MODEL: "${MISTRAL_CHAT_MODEL:-mistral-small-latest}"
+      DEBRIDLINK_API_BASE: "${DEBRIDLINK_API_BASE:-https://debrid-link.com}"
+      DEBRIDLINK_OAUTH_CLIENT_ID: "${DEBRIDLINK_OAUTH_CLIENT_ID:-}"
+      DEBRIDLINK_OAUTH_CLIENT_SECRET: "${DEBRIDLINK_OAUTH_CLIENT_SECRET:-}"
+      DEBRIDLINK_OAUTH_SCOPE: "${DEBRIDLINK_OAUTH_SCOPE:-get.account get.post.delete.downloader get.files get.post.stream}"
+      FILESERVER_ENABLED: "${FILESERVER_ENABLED:-true}"
+      FILESERVER_AUTH_USER: "${FILESERVER_AUTH_USER:-}"
+      FILESERVER_AUTH_PASS: "${FILESERVER_AUTH_PASS:-}"
+      DLNA_ENABLED: "${DLNA_ENABLED:-false}"
+      DLNA_BASE_URL: "${DLNA_BASE_URL:-}"
+      SMB_ENABLED: "${SMB_ENABLED:-false}"
+      SMB_SHARE_NAME: "${SMB_SHARE_NAME:-shelfy}"
+      SMB_SHARE_PATH: "${SMB_SHARE_PATH:-/data/downloads}"
+      SMB_BINARY: "${SMB_BINARY:-smbd}"
+      SMB_STATUS_BINARY: "${SMB_STATUS_BINARY:-smbstatus}"
+      AUTH_ENABLED: "${AUTH_ENABLED:-true}"
+      AUTH_USER: "${AUTH_USER:-admin}"
+      AUTH_PASS: "${AUTH_PASS:-change-me}"
+      AUTH_SESSION_SECRET: "${AUTH_SESSION_SECRET:-change-me-long-random-secret}"
+      AUTH_SESSION_TTL_HOURS: "${AUTH_SESSION_TTL_HOURS:-24}"
     volumes:
       - shelfy_data:/data
       - shelfy_media:/media:ro
@@ -52,40 +52,40 @@ services:
       context: ../..
       dockerfile: deploy/qnap/Dockerfile.worker
     environment:
-      APP_ENV: prod
-      HTTP_ADDR: :8080
-      CONFIG_FILE: ""
-      HTTP_TIMEOUT_SECONDS: "30"
-      DB_DRIVER: sqlite
-      DB_DSN: /data/shelfy.db
-      STORAGE_PATH: /data/downloads
-      MEDIA_PATHS: /data/downloads,/media
-      DOWNLOAD_MAX_CONCURRENT: "3"
-      DOWNLOAD_AUTO_RESUME: "true"
-      AI_ENABLED: "true"
-      AI_TOP_K: "5"
-      MISTRAL_API_KEY: ""
-      MISTRAL_EMBED_MODEL: mistral-embed
-      MISTRAL_CHAT_MODEL: mistral-small-latest
-      DEBRIDLINK_API_BASE: https://debrid-link.com
-      DEBRIDLINK_OAUTH_CLIENT_ID: ""
-      DEBRIDLINK_OAUTH_CLIENT_SECRET: ""
-      DEBRIDLINK_OAUTH_SCOPE: get.account get.post.delete.downloader get.files get.post.stream
-      FILESERVER_ENABLED: "true"
-      FILESERVER_AUTH_USER: ""
-      FILESERVER_AUTH_PASS: ""
-      DLNA_ENABLED: "false"
-      DLNA_BASE_URL: ""
-      SMB_ENABLED: "false"
-      SMB_SHARE_NAME: shelfy
-      SMB_SHARE_PATH: /data/downloads
-      SMB_BINARY: smbd
-      SMB_STATUS_BINARY: smbstatus
-      AUTH_ENABLED: "true"
-      AUTH_USER: admin
-      AUTH_PASS: change-me
-      AUTH_SESSION_SECRET: change-me-long-random-secret
-      AUTH_SESSION_TTL_HOURS: "24"
+      APP_ENV: "${APP_ENV:-prod}"
+      HTTP_ADDR: "${HTTP_ADDR:-:8080}"
+      CONFIG_FILE: "${CONFIG_FILE:-}"
+      HTTP_TIMEOUT_SECONDS: "${HTTP_TIMEOUT_SECONDS:-30}"
+      DB_DRIVER: "${DB_DRIVER:-sqlite}"
+      DB_DSN: "${DB_DSN:-/data/shelfy.db}"
+      STORAGE_PATH: "${STORAGE_PATH:-/data/downloads}"
+      MEDIA_PATHS: "${MEDIA_PATHS:-/data/downloads,/media}"
+      DOWNLOAD_MAX_CONCURRENT: "${DOWNLOAD_MAX_CONCURRENT:-3}"
+      DOWNLOAD_AUTO_RESUME: "${DOWNLOAD_AUTO_RESUME:-true}"
+      AI_ENABLED: "${AI_ENABLED:-false}"
+      AI_TOP_K: "${AI_TOP_K:-5}"
+      MISTRAL_API_KEY: "${MISTRAL_API_KEY:-}"
+      MISTRAL_EMBED_MODEL: "${MISTRAL_EMBED_MODEL:-mistral-embed}"
+      MISTRAL_CHAT_MODEL: "${MISTRAL_CHAT_MODEL:-mistral-small-latest}"
+      DEBRIDLINK_API_BASE: "${DEBRIDLINK_API_BASE:-https://debrid-link.com}"
+      DEBRIDLINK_OAUTH_CLIENT_ID: "${DEBRIDLINK_OAUTH_CLIENT_ID:-}"
+      DEBRIDLINK_OAUTH_CLIENT_SECRET: "${DEBRIDLINK_OAUTH_CLIENT_SECRET:-}"
+      DEBRIDLINK_OAUTH_SCOPE: "${DEBRIDLINK_OAUTH_SCOPE:-get.account get.post.delete.downloader get.files get.post.stream}"
+      FILESERVER_ENABLED: "${FILESERVER_ENABLED:-true}"
+      FILESERVER_AUTH_USER: "${FILESERVER_AUTH_USER:-}"
+      FILESERVER_AUTH_PASS: "${FILESERVER_AUTH_PASS:-}"
+      DLNA_ENABLED: "${DLNA_ENABLED:-false}"
+      DLNA_BASE_URL: "${DLNA_BASE_URL:-}"
+      SMB_ENABLED: "${SMB_ENABLED:-false}"
+      SMB_SHARE_NAME: "${SMB_SHARE_NAME:-shelfy}"
+      SMB_SHARE_PATH: "${SMB_SHARE_PATH:-/data/downloads}"
+      SMB_BINARY: "${SMB_BINARY:-smbd}"
+      SMB_STATUS_BINARY: "${SMB_STATUS_BINARY:-smbstatus}"
+      AUTH_ENABLED: "${AUTH_ENABLED:-true}"
+      AUTH_USER: "${AUTH_USER:-admin}"
+      AUTH_PASS: "${AUTH_PASS:-change-me}"
+      AUTH_SESSION_SECRET: "${AUTH_SESSION_SECRET:-change-me-long-random-secret}"
+      AUTH_SESSION_TTL_HOURS: "${AUTH_SESSION_TTL_HOURS:-24}"
     volumes:
       - shelfy_data:/data
       - shelfy_media:/media:ro
