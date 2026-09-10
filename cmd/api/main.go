@@ -40,6 +40,9 @@ import (
 func main() {
 	cfg := config.Load()
 	log := logger.NewJSONLogger(nil)
+	if err := os.MkdirAll(cfg.StoragePath, 0o755); err != nil {
+		log.Fatal().Err(err).Str("path", cfg.StoragePath).Msg("create storage root")
+	}
 
 	db, err := repo.OpenDB(cfg)
 	if err != nil {
